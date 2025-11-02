@@ -1,8 +1,8 @@
-// src/app/page.tsx - GANTI SELURUH ISI
 "use client";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { SiteNavbar } from "@/components/site-navbar";
 
 interface Settings {
   storeName: string;
@@ -44,40 +44,7 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50">
-      {/* Navbar */}
-      <nav className="bg-white shadow-md sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <Link href="/" className="text-2xl font-bold text-purple-600">
-            {settings?.storeName || "Store Saya"}
-          </Link>
-          <div className="flex items-center space-x-4">
-            <Link
-              href="/"
-              className="text-gray-700 hover:text-purple-600 font-bold"
-            >
-              Beranda
-            </Link>
-            <Link
-              href="/products"
-              className="text-gray-700 hover:text-purple-600"
-            >
-              Produk
-            </Link>
-            <Link
-              href="/contact"
-              className="text-gray-700 hover:text-purple-600"
-            >
-              Kontak
-            </Link>
-            <Link
-              href="/login"
-              className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700"
-            >
-              Login Admin
-            </Link>
-          </div>
-        </div>
-      </nav>
+      <SiteNavbar />
 
       {/* Hero Section */}
       <section className="container mx-auto px-4 py-20 text-center">
