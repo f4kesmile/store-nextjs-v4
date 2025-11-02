@@ -1,8 +1,12 @@
-import { type ClassValue, clsx } from "clsx"
-import { twMerge } from "tailwind-merge"
+import { type ClassValue } from "clsx"
 
+// Simple className merge function without clsx dependency
 export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs))
+  return inputs
+    .filter(Boolean)
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
 export function formatPrice(price: number) {
