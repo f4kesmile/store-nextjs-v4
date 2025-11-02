@@ -82,7 +82,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <nav className="p-4 space-y-2 flex-1">
           {menuItems.map((item) => hasAccess(item) && (
             <Link href={item.path} key={item.path}>
-              <Button variant={pathname === item.path ? "default" : "ghost"} className={cn("w-full justify-start gap-3 h-12", pathname === item.path ? "bg-primary text-primary-foreground shadow-md" : "hover:bg-accent/50")}> 
+              <Button variant={pathname === item.path ? "default" : "ghost"} className={cn("w-full justify-start gap-3 h-12", pathname === item.path ? "bg-primary text-primary-foreground shadow-md" : "hover:bg-accent/50")}>
                 {Icons[item.icon]({ className: "w-5 h-5" })}
                 {sidebarOpen && <span className="font-medium truncate">{item.name}</span>}
               </Button>
