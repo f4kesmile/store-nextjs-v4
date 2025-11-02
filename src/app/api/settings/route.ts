@@ -1,97 +1,44 @@
-// src/app/api/settings/route.ts - GANTI SELURUH ISI
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
-import { logActivity } from '@/lib/logger'
+import { NextRequest, NextResponse } from "next/server";
+import { readFile, writeFile, mkdir } from "fs/promises";
+import path from "path";
 
-export async function GET() {
+const FILE_PATH = path.join(process.cwd(), "data", "settings.json");
+
+async function readSettings() {
   try {
-    let settings = await prisma.siteSettings.findFirst()
-    
-    if (!settings) {
-      // Create default settings if not exists
-      settings = await prisma.siteSettings.create({
-        data: {
-          storeName: 'Devlog Store',
-          storeDescription: 'Platform digital terpercaya Anda untuk semua kebutuhan produk premium dan layanan sosial media.',
-          supportWhatsApp: '6285185031023',
-          supportEmail: 'support@devlog.my.id',
-          storeLocation: 'Tegal, Jawa Tengah, Indonesia',
-          aboutTitle: 'Tentang Devlog Store',
-          aboutDescription: 'Devlog Store adalah platform digital terpercaya Anda untuk semua kebutuhan produk premium dan layanan sosial media. Kami berkomitmen untuk menyediakan solusi digital berkualitas tinggi dengan akses yang mudah dan transaksi yang aman.',
-        },
-      })
-    }
-
-    return NextResponse.json(settings)
-  } catch (error) {
-    console.error('Error fetching settings:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch settings' },
-      { status: 500 }
-    )
+    const raw = await readFile(FILE_PATH, "utf8");
+    return JSON.parse(raw);
+  } catch {
+    await mkdir(path.dirname(FILE_PATH), { recursive: true });
+    const defaults = {
+      storeName: "Store Saya",
+      storeDescription: "Toko online modern dengan sistem manajemen lengkap",
+      supportWhatsApp: "",
+      supportEmail: "",
+      storeLocation: "",
+      aboutTitle: "",
+      aboutDescription: "",
+      logoUrl: "",
+      faviconUrl: "",
+      primaryColor: "#2563EB",
+      secondaryColor: "#10B981",
+      theme: "light",
+      locale: "id",
+    };
+    await writeFile(FILE_PATH, JSON.stringify(defaults, null, 2));
+    return defaults;
   }
 }
 
+export async function GET() {
+  const settings = await readSettings();
+  return NextResponse.json(settings);
+}
+
 export async function PUT(req: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const body = await req.json()
-    const {
-      storeName,
-      storeDescription,
-      supportWhatsApp,
-      supportEmail,
-      storeLocation,
-      aboutTitle,
-      aboutDescription,
-    } = body
-
-    let settings = await prisma.siteSettings.findFirst()
-
-    if (!settings) {
-      settings = await prisma.siteSettings.create({
-        data: {
-          storeName,
-          storeDescription,
-          supportWhatsApp,
-          supportEmail,
-          storeLocation,
-          aboutTitle,
-          aboutDescription,
-        },
-      })
-    } else {
-      settings = await prisma.siteSettings.update({
-        where: { id: settings.id },
-        data: {
-          storeName,
-          storeDescription,
-          supportWhatsApp,
-          supportEmail,
-          storeLocation,
-          aboutTitle,
-          aboutDescription,
-        },
-      })
-    }
-
-    await logActivity(
-      parseInt(session.user.id),
-      'Updated site settings'
-    )
-
-    return NextResponse.json(settings)
-  } catch (error) {
-    console.error('Error updating settings:', error)
-    return NextResponse.json(
-      { error: 'Failed to update settings' },
-      { status: 500 }
-    )
-  }
+  const current = await readSettings();
+  const body = await req.json();
+  const merged = { ...current, ...body };
+  await writeFile(FILE_PATH, JSON.stringify(merged, null, 2));
+  return NextResponse.json(merged);
 }
