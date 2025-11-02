@@ -10,12 +10,12 @@ const Icons = { gear: (p:any)=>(<svg viewBox="0 0 24 24" fill="none" stroke="cur
 
 export default function SettingsPage(){
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [formData, setFormData] = useState({
     storeName: "",
     supportEmail: "",
     supportWhatsApp: "",
     locale: "id",
-    // New brand & theme fields
     logoUrl: "",
     faviconUrl: "",
     primaryColor: "#2563EB",
@@ -27,6 +27,18 @@ export default function SettingsPage(){
     e.preventDefault(); setSaving(true);
     try{ await fetch("/api/settings", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(formData) }); }
     finally{ setSaving(false); }
+  }
+
+  async function uploadLogo(file?: File){
+    if(!file) return;
+    setUploading(true);
+    try{
+      const fd = new FormData();
+      fd.append("logo", file);
+      const res = await fetch("/api/upload/logo", { method: "POST", body: fd });
+      const data = await res.json();
+      if(data.logoPath){ setFormData(prev=>({ ...prev, logoUrl: data.logoPath })); }
+    } finally{ setUploading(false); }
   }
 
   return (
@@ -69,7 +81,18 @@ export default function SettingsPage(){
           <CardHeader className="pb-2"><CardTitle className="text-base">Brand & Tema</CardTitle><CardDescription>Logo, favicon, warna, dan tema</CardDescription></CardHeader>
           <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-3">
-              <Input placeholder="Logo URL" value={formData.logoUrl} onChange={(e)=>setFormData({...formData, logoUrl: e.target.value})}/>
+              <div className="space-y-2">
+                <label className="text-sm text-muted-foreground">Upload Logo</label>
+                <div className="flex items-center gap-3">
+                  <input type="file" accept="image/*" onChange={(e)=>uploadLogo(e.target.files?.[0])} />
+                  <Button type="button" variant="outline" disabled>{uploading?"Mengunggah...":"Pilih File"}</Button>
+                </div>
+                {formData.logoUrl && (
+                  <div className="h-12 w-12 rounded bg-muted overflow-hidden grid place-items-center">
+                    <img src={formData.logoUrl} alt="logo" className="max-h-12" />
+                  </div>
+                )}
+              </div>
               <Input placeholder="Favicon URL" value={formData.faviconUrl} onChange={(e)=>setFormData({...formData, faviconUrl: e.target.value})}/>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
