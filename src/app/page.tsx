@@ -3,6 +3,11 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { SiteNavbar } from "@/components/site-navbar";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface Settings {
   storeName: string;
@@ -17,6 +22,7 @@ interface Settings {
 export default function HomePage() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<string>("all");
 
   useEffect(() => {
     fetchSettings();
@@ -34,119 +40,142 @@ export default function HomePage() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 flex items-center justify-center">
-        <div className="text-xl">Loading...</div>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50">
+    <div className="min-h-screen bg-background">
       <SiteNavbar />
 
       {/* Hero Section */}
-      <section className="container mx-auto px-4 py-20 text-center">
-        <h1 className="text-6xl font-bold mb-6 text-gray-800">
-          Selamat Datang di{" "}
-          <span className="text-purple-600">
-            {settings?.storeName || "Store Saya"}
-          </span>
-        </h1>
-        <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
-          {settings?.storeDescription ||
-            "Platform digital terpercaya untuk semua kebutuhan produk premium dan layanan sosial media."}
-        </p>
-        <div className="flex justify-center gap-4">
-          <Link
-            href="/products"
-            className="bg-purple-600 text-white px-8 py-4 rounded-lg text-lg hover:bg-purple-700 font-bold transition-all"
-          >
-            🛍️ Belanja Sekarang
-          </Link>
-          <Link
-            href="/contact"
-            className="bg-white text-purple-600 border-2 border-purple-600 px-8 py-4 rounded-lg text-lg hover:bg-purple-50 font-bold transition-all"
-          >
-            📞 Hubungi Kami
-          </Link>
-        </div>
-      </section>
-
-      {/* Features Section */}
-      <section className="container mx-auto px-4 py-16">
-        <div className="grid md:grid-cols-3 gap-8">
-          <div className="bg-white rounded-xl shadow-lg p-8 text-center hover:shadow-2xl transition-all">
-            <div className="text-5xl mb-4">🚀</div>
-            <h3 className="text-2xl font-bold mb-3 text-gray-800">
-              Cepat & Aman
-            </h3>
-            <p className="text-gray-600">
-              Transaksi cepat dengan sistem keamanan terpercaya
-            </p>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-lg p-8 text-center hover:shadow-2xl transition-all">
-            <div className="text-5xl mb-4">💎</div>
-            <h3 className="text-2xl font-bold mb-3 text-gray-800">
-              Produk Premium
-            </h3>
-            <p className="text-gray-600">
-              Koleksi produk digital berkualitas tinggi
-            </p>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-lg p-8 text-center hover:shadow-2xl transition-all">
-            <div className="text-5xl mb-4">🤝</div>
-            <h3 className="text-2xl font-bold mb-3 text-gray-800">
-              Support 24/7
-            </h3>
-            <p className="text-gray-600">
-              Tim support siap membantu kapan saja
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* About Section - Menggunakan data dari settings */}
-      {settings?.aboutTitle && settings?.aboutDescription && (
-        <section className="container mx-auto px-4 py-16">
-          <div className="bg-gradient-to-br from-slate-800 to-slate-900 text-white rounded-xl shadow-2xl p-8 md:p-12 text-center">
-            <h2 className="text-4xl font-bold mb-6">{settings.aboutTitle}</h2>
-            <p className="text-gray-300 text-lg leading-relaxed max-w-4xl mx-auto whitespace-pre-line">
-              {settings.aboutDescription}
-            </p>
-
-            {/* Quick Contact */}
-            <div className="flex justify-center gap-4 mt-8">
-              <a
-                href={`https://wa.me/${settings.supportWhatsApp}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="bg-green-600 text-white px-8 py-3 rounded-lg hover:bg-green-700 font-bold transition-all"
-              >
-                💬 Chat WhatsApp
-              </a>
-              <a
-                href={`mailto:${settings.supportEmail}`}
-                className="bg-blue-600 text-white px-8 py-3 rounded-lg hover:bg-blue-700 font-bold transition-all"
-              >
-                📧 Kirim Email
-              </a>
+      <section className="container mx-auto px-4 pt-12 pb-8 text-center">
+        {loading ? (
+          <div className="space-y-4">
+            <Skeleton className="h-10 w-72 mx-auto" />
+            <Skeleton className="h-6 w-[36rem] max-w-full mx-auto" />
+            <div className="flex items-center justify-center gap-3">
+              <Skeleton className="h-10 w-36" />
+              <Skeleton className="h-10 w-36" />
             </div>
           </div>
+        ) : (
+          <>
+            <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-4">
+              Selamat Datang di {" "}
+              <span className="text-primary">
+                {settings?.storeName || "Store Saya"}
+              </span>
+            </h1>
+            <p className="text-muted-foreground max-w-2xl mx-auto mb-6">
+              {settings?.storeDescription ||
+                "Platform digital terpercaya untuk semua kebutuhan produk premium dan layanan sosial media."}
+            </p>
+            <div className="flex justify-center gap-3">
+              <Button asChild>
+                <Link href="/products">🛍️ Belanja Sekarang</Link>
+              </Button>
+              <Button asChild variant="outline">
+                <Link href="/contact">📞 Hubungi Kami</Link>
+              </Button>
+            </div>
+          </>
+        )}
+      </section>
+
+      {/* Quick Filters */}
+      <section className="container mx-auto px-4 pb-8">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold">Jelajahi Produk</h2>
+          <div className="w-64 hidden md:block">
+            <Input placeholder="Cari produk..." />
+          </div>
+        </div>
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="grid grid-cols-3 w-full md:w-auto">
+            <TabsTrigger value="all">Semua</TabsTrigger>
+            <TabsTrigger value="popular">Terpopuler</TabsTrigger>
+            <TabsTrigger value="new">Terbaru</TabsTrigger>
+          </TabsList>
+        </Tabs>
+      </section>
+
+      {/* Feature Cards */}
+      <section className="container mx-auto px-4 pb-12">
+        {loading ? (
+          <div className="grid md:grid-cols-3 gap-6">
+            {[1,2,3].map((i) => (
+              <Skeleton key={i} className="h-40 w-full" />
+            ))}
+          </div>
+        ) : (
+          <div className="grid md:grid-cols-3 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>🚀 Cepat & Aman</CardTitle>
+              </CardHeader>
+              <CardContent className="text-muted-foreground">
+                Transaksi cepat dengan sistem keamanan terpercaya
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>💎 Produk Premium</CardTitle>
+              </CardHeader>
+              <CardContent className="text-muted-foreground">
+                Koleksi produk digital berkualitas tinggi
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>🤝 Support 24/7</CardTitle>
+              </CardHeader>
+              <CardContent className="text-muted-foreground">
+                Tim support siap membantu kapan saja
+              </CardContent>
+            </Card>
+          </div>
+        )}
+      </section>
+
+      {/* About Section */}
+      {settings?.aboutTitle && settings?.aboutDescription && (
+        <section className="container mx-auto px-4 pb-16">
+          <Card className="bg-gradient-to-br from-muted/70 to-muted p-0 overflow-hidden">
+            <CardContent className="p-8 md:p-12 text-center">
+              <h2 className="text-3xl md:text-4xl font-bold mb-4">
+                {settings.aboutTitle}
+              </h2>
+              <p className="text-muted-foreground max-w-3xl mx-auto whitespace-pre-line">
+                {settings.aboutDescription}
+              </p>
+              <div className="flex justify-center gap-3 mt-6">
+                <Button asChild className="bg-green-600 hover:bg-green-700">
+                  <a
+                    href={`https://wa.me/${settings.supportWhatsApp}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    💬 Chat WhatsApp
+                  </a>
+                </Button>
+                <Button asChild>
+                  <a href={`mailto:${settings.supportEmail}`}>
+                    📧 Kirim Email
+                  </a>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </section>
       )}
 
       {/* Footer */}
-      <footer className="bg-gray-800 text-white py-8">
-        <div className="container mx-auto px-4 text-center">
-          <h3 className="text-2xl font-bold mb-2">
+      <footer className="border-t">
+        <div className="container mx-auto px-4 py-8 text-center">
+          <h3 className="text-xl font-bold mb-1">
             {settings?.storeName || "Store Saya"}
           </h3>
-          <p className="text-gray-400 mb-4">{settings?.storeDescription}</p>
-          <div className="flex justify-center items-center gap-4 text-sm text-gray-400">
+          <p className="text-sm text-muted-foreground mb-3">
+            {settings?.storeDescription}
+          </p>
+          <div className="flex justify-center items-center gap-3 text-xs text-muted-foreground">
             {settings?.storeLocation && (
               <>
                 <span>📍 {settings.storeLocation}</span>
