@@ -1,7 +1,8 @@
 "use client";
 
+// Minimal toast system without JSX to avoid TS parser issues
+import { createPortal } from "react-dom";
 import * as React from "react";
-import { ToastProvider, ToastViewport, Toast, ToastTitle, ToastDescription, ToastClose } from "@/components/ui/toast";
 
 export type ToastItem = { id: string; title?: string; description?: string };
 
@@ -13,7 +14,7 @@ export function toast(props: { title?: string; description?: string }) {
   const item: ToastItem = { id, title: props.title || "", description: props.description || "" };
   queue = [item, ...queue].slice(0, 3);
   for (let i = 0; i < listeners.length; i++) listeners[i](queue);
-  setTimeout(function(){ dismiss(id); }, 5000);
+  setTimeout(function(){ dismiss(id); }, 4000);
   return { id };
 }
 
@@ -23,25 +24,31 @@ export function dismiss(id?: string) {
   for (let i = 0; i < listeners.length; i++) listeners[i](queue);
 }
 
-export function Toaster() {
+export function Toaster(){
   const [toasts, setToasts] = React.useState<ToastItem[]>(queue);
+  const [mounted, setMounted] = React.useState(false);
+  const [container, setContainer] = React.useState<HTMLElement|null>(null);
   React.useEffect(function(){
     listeners.push(setToasts);
+    setMounted(true);
+    const el = document.getElementById("toast-root");
+    if (el) setContainer(el);
     return function(){ listeners = listeners.filter(function(l){ return l !== setToasts; }); };
   }, []);
 
-  return (
-    <ToastProvider>
-      {toasts.map(function(t){
-        return (
-          <Toast key={t.id}>
-            {t.title ? <ToastTitle>{t.title}</ToastTitle> : null}
-            {t.description ? <ToastDescription>{t.description}</ToastDescription> : null}
-            <ToastClose />
-          </Toast>
+  if (!mounted || !container) return null;
+
+  return createPortal(
+    React.createElement("div", { className: "fixed z-[100] bottom-4 right-4 flex flex-col gap-2" },
+      toasts.map(function(t){
+        return React.createElement(
+          "div",
+          { key: t.id, className: "min-w-[260px] rounded-md border bg-background text-foreground shadow-lg px-4 py-3" },
+          React.createElement("div", { className: "text-sm font-semibold" }, t.title || ""),
+          t.description ? React.createElement("div", { className: "text-xs opacity-80 mt-1" }, t.description) : null
         );
-      })}
-      <ToastViewport />
-    </ToastProvider>
+      })
+    ),
+    container
   );
 }
