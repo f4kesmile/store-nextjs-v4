@@ -1,4 +1,4 @@
-/* Tailwind dark mode and design tokens for admin */
+/* Tailwind dark mode and design tokens for admin - enforce dark for all components */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -17,7 +17,7 @@
     --secondary-foreground: 210 40% 98%;
     --muted: 20 14% 18%;
     --muted-foreground: 217 12% 62%;
-    --accent: 220 14% 18%;
+    --accent: 220 14% 14%;
     --accent-foreground: 210 40% 98%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 210 40% 98%;
@@ -28,24 +28,16 @@
     --radius: 0.6rem;
   }
 
-  .dark {
-    color-scheme: dark;
-  }
-
-  html {
-    @apply dark;
-  }
-
-  body {
-    @apply bg-[hsl(var(--background))] text-[hsl(var(--foreground))];
-  }
+  html { @apply dark; }
+  body { @apply bg-[hsl(var(--background))] text-[hsl(var(--foreground))]; }
 }
 
-/* Compact table and form spacing for simpler look */
 @layer components {
-  .admin-container { @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8; }
-  .admin-section { @apply bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-xl; }
-  .admin-section-header { @apply px-4 sm:px-6 py-4 border-b border-[hsl(var(--border))] flex items-center justify-between; }
-  .admin-section-content { @apply p-4 sm:p-6; }
-  .admin-grid { @apply grid gap-4 sm:gap-5; }
+  /* Force all shadcn primitives into dark surfaces */
+  .admin-surface { @apply bg-[hsl(var(--card))] border border-[hsl(var(--border))] text-[hsl(var(--foreground))]; }
+  .admin-input { @apply bg-[hsl(var(--accent))] border-[hsl(var(--border))] placeholder:text-white/50; }
+  .admin-table { @apply bg-[hsl(var(--card))] text-[hsl(var(--foreground))]; }
+  .admin-table thead tr { @apply bg-[hsl(var(--accent))]; }
+  .admin-table tr { @apply border-b border-[hsl(var(--border))]; }
+  .admin-table td, .admin-table th { @apply text-[hsl(var(--foreground))]; }
 }
