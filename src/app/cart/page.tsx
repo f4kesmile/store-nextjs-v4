@@ -10,6 +10,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Minus, Plus, Trash2 } from "lucide-react";
+import { toast } from "@/components/ui/use-toast";
 
 export default function CartPage() {
   return (
@@ -54,7 +55,7 @@ function CartContent() {
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Keranjang ({getCartCount()})</h1>
           <div className="flex items-center gap-2">
             <Input value={filter} onChange={(e)=>setFilter(e.target.value)} placeholder="Cari di keranjang..." className="w-56" />
-            <Button variant="destructive" onClick={() => { if (confirm("Kosongkan keranjang?")) clearCart(); }}>Kosongkan</Button>
+            <Button variant="destructive" onClick={() => { if (confirm("Kosongkan keranjang?")) { clearCart(); toast({ title: "Keranjang dikosongkan" }); } }}>Kosongkan</Button>
           </div>
         </div>
 
@@ -89,18 +90,19 @@ function CartContent() {
                               <p className="text-xs text-muted-foreground">{item.variantName}: {item.variantValue}</p>
                             )}
                           </div>
-                          <Button variant="ghost" className="text-destructive" onClick={() => removeFromCart(item.productId, item.variantId)}>
+                          <Button variant="ghost" className="text-destructive" onClick={() => { removeFromCart(item.productId, item.variantId); toast({ title: "Item dihapus", description: item.productName }); }}>
                             <Trash2 className="h-4 w-4"/>
                           </Button>
                         </div>
 
                         <div className="mt-3 flex items-center gap-2">
-                          <Button size="icon" variant="outline" onClick={() => updateQuantity(item.productId, item.quantity - 1, item.variantId)}><Minus className="h-4 w-4"/></Button>
+                          <Button size="icon" variant="outline" onClick={() => { updateQuantity(item.productId, item.quantity - 1, item.variantId); toast({ title: "Jumlah diubah", description: `${item.productName}: ${item.quantity - 1}` }); }}><Minus className="h-4 w-4"/></Button>
                           <Input value={item.quantity} onChange={(e)=>{
                             const v = parseInt(e.target.value)||1;
                             updateQuantity(item.productId, v, item.variantId);
+                            toast({ title: "Jumlah diubah", description: `${item.productName}: ${v}` });
                           }} className="w-16 text-center" />
-                          <Button size="icon" variant="outline" onClick={() => updateQuantity(item.productId, item.quantity + 1, item.variantId)}><Plus className="h-4 w-4"/></Button>
+                          <Button size="icon" variant="outline" onClick={() => { updateQuantity(item.productId, item.quantity + 1, item.variantId); toast({ title: "Jumlah diubah", description: `${item.productName}: ${item.quantity + 1}` }); }}><Plus className="h-4 w-4"/></Button>
                           <span className="text-xs text-muted-foreground">Max: {item.maxStock}</span>
                         </div>
 

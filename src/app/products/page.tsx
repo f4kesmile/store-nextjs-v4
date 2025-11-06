@@ -12,7 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
-import { ShoppingCart, Info, Plus, Minus, Trash2 } from "lucide-react";
+import { ShoppingCart, Info } from "lucide-react";
+import { toast } from "@/components/ui/use-toast";
 
 interface Variant { id: number; name: string; value: string; stock: number; }
 interface Product { id: number; name: string; description: string; iconUrl: string; price: number; stock: number; status: string; enableNotes: boolean; variants: Variant[]; }
@@ -152,6 +153,7 @@ function ProductsContent() {
                           maxStock: Math.max(product.stock, ...product.variants.map(v=>v.stock||0)),
                           enableNotes: product.enableNotes,
                         });
+                        toast({ title: "Ditambahkan", description: `${product.name} (x1) ke keranjang` });
                       }} disabled={!hasStock}>
                         + Keranjang
                       </Button>
