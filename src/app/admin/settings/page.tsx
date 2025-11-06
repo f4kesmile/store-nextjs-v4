@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useToast } from "@/components/ui/toast";
+import { toast } from "@/components/ui/use-toast";
 import { useSettings } from "@/contexts/SettingsContext";
 import { Loader2 } from "lucide-react";
 
@@ -14,7 +14,6 @@ const Icons = {
 };
 
 export default function SettingsPage(){
-  const toast = useToast();
   const { settings, loading, refresh, setSettingsLocal } = useSettings();
 
   const [saving, setSaving] = useState(false);
@@ -36,7 +35,6 @@ export default function SettingsPage(){
     theme: "light" as "light" | "dark",
   });
 
-  // Auto-fill form with existing settings
   useEffect(() => {
     if (!loading && settings) {
       setFormData({
@@ -60,142 +58,47 @@ export default function SettingsPage(){
   async function submit(e: React.FormEvent){
     e.preventDefault(); 
     setSaving(true);
-    
     try{ 
       const res = await fetch("/api/settings", { 
         method: "PUT", 
         headers: { "Content-Type": "application/json" }, 
         body: JSON.stringify(formData) 
       });
-      
       if (res.ok) {
         await refresh();
-        toast({ 
-          title: "\u2705 Berhasil disimpan!", 
-          description: "Pengaturan telah diperbarui.",
-          variant: "success" 
-        });
+        toast({ title: "Berhasil disimpan", description: "Pengaturan diperbarui" });
       } else {
-        throw new Error('Failed to save settings');
+        toast({ title: "Gagal menyimpan", variant: "destructive" });
       }
-    } catch (error) {
-      console.error('Error saving settings:', error);
-      toast({ 
-        title: "\u274c Gagal menyimpan", 
-        description: "Silakan coba lagi.",
-        variant: "destructive" 
-      });
-    } finally{ 
-      setSaving(false); 
-    }
+    } finally{ setSaving(false); }
   }
 
   async function uploadFile(kind: "logo" | "favicon", file?: File){
     if(!file) return;
-    
-    // Check file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      toast({ 
-        title: "File terlalu besar", 
-        description: "Maksimal ukuran file 5MB",
-        variant: "destructive" 
-      });
-      return;
-    }
-    
-    if(kind === "logo") setUploadingLogo(true); 
-    else setUploadingFavicon(true);
-    
+    if(kind === "logo") setUploadingLogo(true); else setUploadingFavicon(true);
     try{
-      const fd = new FormData();
-      fd.append(kind, file);
-      
+      const fd = new FormData(); fd.append(kind, file);
       const res = await fetch(`/api/upload/${kind}`, { method: "POST", body: fd });
       const data = await res.json();
-      
       if (res.ok) {
-        if(data.logoPath && kind === "logo"){ 
-          setFormData(prev=>({ ...prev, logoUrl: data.logoPath })); 
-          setSettingsLocal({ logoUrl: data.logoPath });
-          toast({ 
-            title: "\u2705 Logo berhasil diupload!", 
-            variant: "success" 
-          });
-        }
-        if(data.faviconPath && kind === "favicon"){ 
-          setFormData(prev=>({ ...prev, faviconUrl: data.faviconPath })); 
-          setSettingsLocal({ faviconUrl: data.faviconPath });
-          toast({ 
-            title: "\u2705 Favicon berhasil diupload!", 
-            variant: "success" 
-          });
-        }
-      } else {
-        throw new Error(data.error || 'Upload failed');
-      }
-    } catch (error) {
-      console.error('Upload error:', error);
-      toast({ 
-        title: `\u274c Gagal upload ${kind === 'logo' ? 'logo' : 'favicon'}`, 
-        description: "Silakan coba lagi.",
-        variant: "destructive" 
-      });
-    } finally{ 
-      if(kind === "logo") setUploadingLogo(false); 
-      else setUploadingFavicon(false); 
-    }
+        if(data.logoPath && kind === "logo"){ setFormData(prev=>({ ...prev, logoUrl: data.logoPath })); setSettingsLocal({ logoUrl: data.logoPath }); toast({ title: "Logo diupload" }); }
+        if(data.faviconPath && kind === "favicon"){ setFormData(prev=>({ ...prev, faviconUrl: data.faviconPath })); setSettingsLocal({ faviconUrl: data.faviconPath }); toast({ title: "Favicon diupload" }); }
+      } else { toast({ title: "Upload gagal", variant: "destructive" }); }
+    } finally{ if(kind === "logo") setUploadingLogo(false); else setUploadingFavicon(false); }
   }
 
-  // Handle live color preview updates
   const handleColorChange = (colorType: 'primaryColor' | 'secondaryColor', value: string) => {
     setFormData(prev => ({ ...prev, [colorType]: value }));
     setSettingsLocal({ [colorType]: value });
   };
-
   const handleThemeChange = (value: string) => {
     const theme = value as "light" | "dark";
     setFormData(prev => ({ ...prev, theme }));
     setSettingsLocal({ theme });
   };
 
-  if (loading) {
-    return (
-      <div className="space-y-6">
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <span className="size-8 rounded-md bg-muted grid place-items-center animate-pulse"><Icons.gear className="w-4 h-4"/></span>
-              <div>
-                <CardTitle className="text-lg">Settings</CardTitle>
-                <CardDescription>Memuat pengaturan...</CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-        </Card>
-        <div className="flex items-center justify-center min-h-96">
-          <div className="flex items-center gap-3">
-            <Loader2 className="w-6 h-6 animate-spin brand-primary" />
-            <span className="text-lg">Loading settings...</span>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center gap-2">
-            <span className="size-8 rounded-md bg-brand-soft grid place-items-center"><Icons.gear className="w-4 h-4 brand-primary"/></span>
-            <div>
-              <CardTitle className="text-lg">Settings</CardTitle>
-              <CardDescription>Konfigurasi dasar toko + Brand & Tema</CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-      </Card>
-
       <form onSubmit={submit} className="grid grid-cols-1 gap-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Card>
@@ -204,37 +107,11 @@ export default function SettingsPage(){
               <CardDescription>Nama dan kontak</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              <Input 
-                placeholder="Nama Toko" 
-                value={formData.storeName} 
-                onChange={(e)=>setFormData({...formData, storeName: e.target.value})}
-                disabled={saving}
-              />
-              <Input 
-                placeholder="Deskripsi Toko"
-                value={formData.storeDescription} 
-                onChange={(e)=>setFormData({...formData, storeDescription: e.target.value})}
-                disabled={saving}
-              />
-              <Input 
-                placeholder="Email Toko" 
-                type="email"
-                value={formData.supportEmail} 
-                onChange={(e)=>setFormData({...formData, supportEmail: e.target.value})}
-                disabled={saving}
-              />
-              <Input 
-                placeholder="No. WhatsApp (contoh: +6281234567890)" 
-                value={formData.supportWhatsApp} 
-                onChange={(e)=>setFormData({...formData, supportWhatsApp: e.target.value})}
-                disabled={saving}
-              />
-              <Input 
-                placeholder="Lokasi Toko" 
-                value={formData.storeLocation} 
-                onChange={(e)=>setFormData({...formData, storeLocation: e.target.value})}
-                disabled={saving}
-              />
+              <Input placeholder="Nama Toko" value={formData.storeName} onChange={(e)=>setFormData({...formData, storeName: e.target.value})} disabled={saving} />
+              <Input placeholder="Deskripsi Toko" value={formData.storeDescription} onChange={(e)=>setFormData({...formData, storeDescription: e.target.value})} disabled={saving} />
+              <Input placeholder="Email Toko" type="email" value={formData.supportEmail} onChange={(e)=>setFormData({...formData, supportEmail: e.target.value})} disabled={saving} />
+              <Input placeholder="No. WhatsApp (contoh: +6281234567890)" value={formData.supportWhatsApp} onChange={(e)=>setFormData({...formData, supportWhatsApp: e.target.value})} disabled={saving} />
+              <Input placeholder="Lokasi Toko" value={formData.storeLocation} onChange={(e)=>setFormData({...formData, storeLocation: e.target.value})} disabled={saving} />
             </CardContent>
           </Card>
 
@@ -247,91 +124,29 @@ export default function SettingsPage(){
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Upload Logo</label>
-                  <input 
-                    className="block w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-primary/10 file:text-primary hover:file:bg-primary/20 disabled:opacity-50" 
-                    type="file" 
-                    accept="image/*" 
-                    onChange={(e)=>uploadFile("logo", e.target.files?.[0])} 
-                    disabled={uploadingLogo || saving}
-                  />
-                  <div className="h-12 w-12 rounded bg-muted overflow-hidden grid place-items-center border">
-                    {formData.logoUrl ? (
-                      <img src={formData.logoUrl} alt="logo" className="max-h-12" />
-                    ) : (
-                      <div className="text-xs text-muted-foreground">Logo</div>
-                    )}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    {uploadingLogo ? (
-                      <span className="flex items-center gap-1">
-                        <Loader2 className="w-3 h-3 animate-spin" />
-                        Mengunggah...
-                      </span>
-                    ) : (
-                      "PNG/JPG transparan direkomendasikan"
-                    )}
-                  </div>
+                  <input className="block w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-primary/10 file:text-primary hover:file:bg-primary/20 disabled:opacity-50" type="file" accept="image/*" onChange={(e)=>uploadFile("logo", e.target.files?.[0])} disabled={uploadingLogo || saving} />
                 </div>
 
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Upload Favicon</label>
-                  <input 
-                    className="block w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-primary/10 file:text-primary hover:file:bg-primary/20 disabled:opacity-50" 
-                    type="file" 
-                    accept="image/x-icon,image/png" 
-                    onChange={(e)=>uploadFile("favicon", e.target.files?.[0])} 
-                    disabled={uploadingFavicon || saving}
-                  />
-                  <div className="h-8 w-8 rounded bg-muted overflow-hidden grid place-items-center border">
-                    {formData.faviconUrl ? (
-                      <img src={formData.faviconUrl} alt="favicon" className="max-h-8" />
-                    ) : (
-                      <div className="text-[10px] text-muted-foreground">ico</div>
-                    )}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    {uploadingFavicon ? (
-                      <span className="flex items-center gap-1">
-                        <Loader2 className="w-3 h-3 animate-spin" />
-                        Mengunggah...
-                      </span>
-                    ) : (
-                      "PNG 32x32 atau ICO"
-                    )}
-                  </div>
+                  <input className="block w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-primary/10 file:text-primary hover:file:bg-primary/20 disabled:opacity-50" type="file" accept="image/x-icon,image/png" onChange={(e)=>uploadFile("favicon", e.target.files?.[0])} disabled={uploadingFavicon || saving} />
                 </div>
 
                 <div className="space-y-3">
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
                       <label className="text-sm font-medium">Primary</label>
-                      <Input 
-                        type="color" 
-                        value={formData.primaryColor} 
-                        onChange={(e)=>handleColorChange('primaryColor', e.target.value)}
-                        disabled={saving}
-                        className="h-10 cursor-pointer"
-                      />
+                      <Input type="color" value={formData.primaryColor} onChange={(e)=>handleColorChange('primaryColor', e.target.value)} disabled={saving} className="h-10 cursor-pointer" />
                     </div>
                     <div className="space-y-1">
                       <label className="text-sm font-medium">Secondary</label>
-                      <Input 
-                        type="color" 
-                        value={formData.secondaryColor} 
-                        onChange={(e)=>handleColorChange('secondaryColor', e.target.value)}
-                        disabled={saving}
-                        className="h-10 cursor-pointer"
-                      />
+                      <Input type="color" value={formData.secondaryColor} onChange={(e)=>handleColorChange('secondaryColor', e.target.value)} disabled={saving} className="h-10 cursor-pointer" />
                     </div>
                   </div>
                   <div className="space-y-1">
                     <label className="text-sm font-medium">Tema default</label>
-                    <Select 
-                      value={formData.theme} 
-                      onValueChange={handleThemeChange}
-                      disabled={saving}
-                    >
-                      <SelectTrigger><SelectValue placeholder="Tema default"/></SelectTrigger>
+                    <Select value={formData.theme} onValueChange={handleThemeChange}>
+                      <SelectTrigger disabled={saving}><SelectValue placeholder="Tema default"/></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="light">Light</SelectItem>
                         <SelectItem value="dark">Dark</SelectItem>
@@ -340,54 +155,13 @@ export default function SettingsPage(){
                   </div>
                 </div>
               </div>
-
-              <div className="mt-6 space-y-2">
-                <div className="text-sm text-muted-foreground">Preview</div>
-                <div className="border rounded-lg p-4 space-y-3">
-                  <div className="flex items-center gap-3">
-                    <div className="size-10 rounded bg-muted overflow-hidden grid place-items-center">
-                      {formData.logoUrl ? (
-                        <img src={formData.logoUrl} alt="logo" className="max-h-10"/>
-                      ) : (
-                        <div className="text-xs text-muted-foreground">Logo</div>
-                      )}
-                    </div>
-                    <div className="flex gap-2">
-                      <span className="size-6 rounded border" style={{ background: formData.primaryColor }} />
-                      <span className="size-6 rounded border" style={{ background: formData.secondaryColor }} />
-                    </div>
-                    <div className="ml-auto flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground">Favicon</span>
-                      <div className="size-6 rounded overflow-hidden bg-muted grid place-items-center border">
-                        {formData.faviconUrl ? (
-                          <img src={formData.faviconUrl} alt="favicon" className="max-h-6" />
-                        ) : (
-                          <div className="text-[10px] text-muted-foreground">ico</div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="text-xs text-muted-foreground">Tema: {formData.theme}</div>
-                </div>
-              </div>
             </CardContent>
           </Card>
         </div>
 
         <div className="flex gap-2">
-          <Button 
-            type="submit" 
-            disabled={saving || uploadingLogo || uploadingFavicon} 
-            className="ml-auto bg-brand-primary hover:bg-brand-primary/90"
-          >
-            {saving ? (
-              <span className="flex items-center gap-2">
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Menyimpan...
-              </span>
-            ) : (
-              "Simpan Settings"
-            )}
+          <Button type="submit" disabled={saving || uploadingLogo || uploadingFavicon} className="ml-auto">
+            {saving ? (<span className="flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" />Menyimpan...</span>) : ("Simpan Settings")}
           </Button>
         </div>
       </form>
