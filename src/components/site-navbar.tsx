@@ -5,7 +5,8 @@ import { usePathname } from "next/navigation";
 import { ShoppingCart, User, Search, Menu, X, Home, Package, Phone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useCart } from "@/contexts/CartContext";
 
 const nav = [
   { href: "/", label: "Home", icon: Home },
@@ -16,6 +17,10 @@ const nav = [
 export function SiteNavbar(){
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const { getCartCount } = useCart();
+  const [count, setCount] = useState(0);
+  useEffect(() => { setCount(getCartCount()); }, [getCartCount]);
+
   return (
     <nav className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-14 items-center">
@@ -33,7 +38,12 @@ export function SiteNavbar(){
 
         <div className="ml-auto flex items-center gap-1">
           <Button variant="ghost" size="icon" aria-label="Search"><Search className="h-5 w-5"/></Button>
-          <Link href="/cart" className="p-2"><ShoppingCart className="h-5 w-5"/></Link>
+          <Link href="/cart" className="relative p-2">
+            <ShoppingCart className="h-5 w-5"/>
+            {count > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-primary text-primary-foreground text-[10px] px-1 font-medium">{count}</span>
+            )}
+          </Link>
           <Link href="/admin" className="p-2"><User className="h-5 w-5"/></Link>
           <Sheet open={open} onOpenChange={setOpen}>
             <SheetTrigger asChild>
