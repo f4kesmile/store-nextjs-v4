@@ -1,0 +1,3 @@
+/* Admin UI overhaul base styles */
+.admin-dark .admin-card { background: hsl(var(--card)); border: 1px solid hsl(var(--border)); }
+.admin-dark .admin-dialog .radix-overlay { background: rgba(0,0,0,.6); backdrop-filter: blur(2px); }
