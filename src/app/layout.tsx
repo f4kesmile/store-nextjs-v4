@@ -6,6 +6,7 @@ import { ResellerProvider } from "@/contexts/ResellerContext";
 import { ThemeProvider } from "@/components/theme-provider";
 import { getServerSettings } from "@/lib/server-settings";
 import HeadFavicon from "@/components/HeadFavicon";
+import { Toaster } from "@/components/ui/toaster";
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await getServerSettings();
@@ -30,6 +31,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <ResellerProvider>
               <CartProvider>
                 {children}
+                <Toaster />
               </CartProvider>
             </ResellerProvider>
           </Providers>
