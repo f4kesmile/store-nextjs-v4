@@ -20,8 +20,8 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="id" className={typeof window !== 'undefined' && window.location.pathname.startsWith('/admin') ? 'admin-dark' : ''}>
-      <body className={typeof window !== 'undefined' && window.location.pathname.startsWith('/admin') ? 'admin-body' : ''}>
+    <html lang="id">
+      <body>
         <ThemeProvider>
           <Providers>
             <HeadFavicon />
