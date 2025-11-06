@@ -44,59 +44,90 @@ const STORAGE_KEY = 'locked_reseller_ref';
 export function ResellerProvider({ children }: { children: React.ReactNode }) {
   const [lockedRef, setLockedRef] = useState<string | null>(null);
   const [currentRef, setCurrentRef] = useState<string | null>(null);
-  const searchParams = useSearchParams();
-  const router = useRouter();
+  const [mounted, setMounted] = useState(false);
+  
+  // Handle mounting
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Load locked ref from localStorage on mount
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      setLockedRef(stored);
-    }
-  }, []);
-
-  // Monitor URL params for ref
-  useEffect(() => {
-    const ref = searchParams.get('ref');
-    if (ref && RESELLER_DATA[ref]) {
-      setCurrentRef(ref);
-      
-      // Auto-lock if no ref is locked yet
-      if (!lockedRef) {
-        lockRef(ref);
+    if (mounted && typeof window !== 'undefined') {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored && RESELLER_DATA[stored]) {
+        setLockedRef(stored);
       }
-    } else {
-      setCurrentRef(null);
     }
-  }, [searchParams, lockedRef]);
+  }, [mounted]);
+
+  // Monitor URL params for ref (only on client side)
+  useEffect(() => {
+    if (!mounted) return;
+    
+    const checkUrlRef = () => {
+      if (typeof window !== 'undefined') {
+        const urlParams = new URLSearchParams(window.location.search);
+        const ref = urlParams.get('ref');
+        
+        if (ref && RESELLER_DATA[ref]) {
+          setCurrentRef(ref);
+          
+          // Auto-lock if no ref is locked yet
+          if (!lockedRef) {
+            lockRef(ref);
+          }
+        } else {
+          setCurrentRef(null);
+        }
+      }
+    };
+    
+    checkUrlRef();
+    
+    // Listen for URL changes
+    window.addEventListener('popstate', checkUrlRef);
+    return () => window.removeEventListener('popstate', checkUrlRef);
+  }, [mounted, lockedRef]);
 
   const lockRef = (ref: string) => {
     if (RESELLER_DATA[ref]) {
       setLockedRef(ref);
-      localStorage.setItem(STORAGE_KEY, ref);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(STORAGE_KEY, ref);
+      }
     }
   };
 
   const resetReseller = () => {
     setLockedRef(null);
     setCurrentRef(null);
-    localStorage.removeItem(STORAGE_KEY);
-    
-    // Remove ref from URL without affecting cart
-    const url = new URL(window.location.href);
-    url.searchParams.delete('ref');
-    router.replace(url.pathname + (url.search || ''));
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(STORAGE_KEY);
+      
+      // Remove ref from URL without affecting cart
+      const url = new URL(window.location.href);
+      url.searchParams.delete('ref');
+      window.history.replaceState({}, '', url.pathname + (url.search || ''));
+    }
   };
 
   const getResellerWhatsApp = () => {
     const ref = lockedRef || currentRef;
-    return ref && RESELLER_DATA[ref] ? RESELLER_DATA[ref].whatsapp : process.env.NEXT_PUBLIC_DEFAULT_WHATSAPP || '6281234567890';
+    return ref && RESELLER_DATA[ref] 
+      ? RESELLER_DATA[ref].whatsapp 
+      : process.env.NEXT_PUBLIC_DEFAULT_WHATSAPP || '6281234567890';
   };
 
   const getResellerData = () => {
     const ref = lockedRef || currentRef;
     return ref && RESELLER_DATA[ref] ? RESELLER_DATA[ref] : null;
   };
+
+  // Don't render until mounted to avoid hydration issues
+  if (!mounted) {
+    return <>{children}</>;
+  }
 
   return (
     <ResellerContext.Provider

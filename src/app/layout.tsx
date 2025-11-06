@@ -6,7 +6,6 @@ import { ResellerProvider } from "@/contexts/ResellerContext";
 import { ThemeProvider } from "@/components/theme-provider";
 import { getServerSettings } from "@/lib/server-settings";
 import HeadFavicon from "@/components/HeadFavicon";
-import { Suspense } from "react";
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await getServerSettings();
@@ -28,11 +27,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ThemeProvider>
           <Providers>
             <HeadFavicon />
-            <Suspense fallback={<div>Loading...</div>}>
-              <ResellerProvider>
-                <CartProvider>{children}</CartProvider>
-              </ResellerProvider>
-            </Suspense>
+            <ResellerProvider>
+              <CartProvider>
+                {children}
+              </CartProvider>
+            </ResellerProvider>
           </Providers>
         </ThemeProvider>
       </body>
