@@ -1,66 +1,78 @@
-"use client";
-import { createContext, useContext, useState, ReactNode, useCallback } from "react";
+// Re-export toast functionality for easier imports
+export { toast } from '@/lib/toast';
 
-type Toast = { 
-  id: number; 
-  title?: string; 
-  description?: string; 
-  variant?: "default" | "success" | "destructive" 
-};
+// You can also add React-based toast components here if needed
+import React from 'react';
 
-const ToastCtx = createContext<{ 
-  toasts: Toast[]; 
-  show: (t: Omit<Toast, "id">) => void; 
-  remove: (id: number) => void 
-} | null>(null);
-
-export function ToastProvider({ children }: { children: ReactNode }) {
-  const [toasts, setToasts] = useState<Toast[]>([]);
-  
-  const show = useCallback((t: Omit<Toast, "id">) => {
-    const id = Date.now() + Math.random();
-    setToasts((prev) => [...prev, { id, ...t }]);
-    setTimeout(() => setToasts((prev) => prev.filter((x) => x.id !== id)), 4000);
-  }, []);
-  
-  const remove = useCallback((id: number) => setToasts((prev) => prev.filter((x) => x.id !== id)), []);
-
-  return (
-    <ToastCtx.Provider value={{ toasts, show, remove }}>
-      {children}
-      <div className="fixed bottom-4 right-4 z-50 space-y-2">
-        {toasts.map((t) => (
-          <div
-            key={t.id}
-            className={`min-w-[260px] max-w-[360px] rounded-md border p-4 shadow-lg bg-white transition-all duration-300 animate-in slide-in-from-right-2 ${
-              t.variant === "success" 
-                ? "border-green-300 bg-green-50 text-green-800" 
-                : t.variant === "destructive" 
-                ? "border-red-300 bg-red-50 text-red-800" 
-                : "border-border"
-            }`}
-          >
-            <div className="flex justify-between items-start">
-              <div className="flex-1">
-                {t.title && <div className="font-medium mb-1">{t.title}</div>}
-                {t.description && <div className="text-sm opacity-80">{t.description}</div>}
-              </div>
-              <button 
-                onClick={() => remove(t.id)}
-                className="ml-3 text-lg opacity-50 hover:opacity-100 transition-opacity"
-              >
-                ×
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-    </ToastCtx.Provider>
-  );
+export interface ToastProps {
+  message: string;
+  type?: 'success' | 'error' | 'info' | 'warning';
+  onClose?: () => void;
 }
 
-export function useToast() {
-  const ctx = useContext(ToastCtx);
-  if (!ctx) throw new Error("useToast must be used within ToastProvider");
-  return ctx.show;
+export function Toast({ message, type = 'info', onClose }: ToastProps) {
+  const getTypeStyles = () => {
+    switch (type) {
+      case 'success':
+        return 'bg-green-50 border-green-200 text-green-800';
+      case 'error':
+        return 'bg-red-50 border-red-200 text-red-800';
+      case 'warning':
+        return 'bg-yellow-50 border-yellow-200 text-yellow-800';
+      case 'info':
+      default:
+        return 'bg-blue-50 border-blue-200 text-blue-800';
+    }
+  };
+  
+  const getIcon = () => {
+    switch (type) {
+      case 'success':
+        return (
+          <svg className="w-5 h-5 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+          </svg>
+        );
+      case 'error':
+        return (
+          <svg className="w-5 h-5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+          </svg>
+        );
+      case 'warning':
+        return (
+          <svg className="w-5 h-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+          </svg>
+        );
+      case 'info':
+      default:
+        return (
+          <svg className="w-5 h-5 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+          </svg>
+        );
+    }
+  };
+  
+  return (
+    <div className={`max-w-sm p-4 rounded-lg shadow-lg border ${getTypeStyles()}`}>
+      <div className="flex items-center gap-3">
+        <div className="flex-shrink-0">{getIcon()}</div>
+        <div className="flex-1">
+          <p className="text-sm font-medium">{message}</p>
+        </div>
+        {onClose && (
+          <button 
+            onClick={onClose}
+            className="flex-shrink-0 ml-2 text-gray-400 hover:text-gray-600 focus:outline-none"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        )}
+      </div>
+    </div>
+  );
 }
