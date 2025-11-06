@@ -5,12 +5,11 @@ import Link from "next/link";
 import { SiteNavbar } from "@/components/site-navbar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { FloatingBlob, Wave } from "@/components/visuals/svg-animated";
+import { revealOnScroll } from "@/lib/anim";
 
 interface Settings {
-  storeName: string;
-  storeDescription: string;
   supportWhatsApp: string;
   supportEmail: string;
   storeLocation: string;
@@ -28,10 +27,9 @@ export default function ContactPage() {
         const res = await fetch("/api/settings");
         const data = await res.json();
         setSettings(data);
-      } catch (e) {
-        console.error(e);
       } finally {
         setLoading(false);
+        setTimeout(revealOnScroll, 0);
       }
     })();
   }, []);
@@ -40,102 +38,90 @@ export default function ContactPage() {
     <div className="min-h-screen bg-background">
       <SiteNavbar />
 
-      <section className="container mx-auto px-4 py-8">
-        <div className="max-w-4xl mx-auto">
-          <h1 className="text-3xl font-bold tracking-tight text-center mb-2">Hubungi Kami</h1>
-          <p className="text-center text-muted-foreground mb-8">Kami siap membantu Anda kapan saja.</p>
-
-          {/* Quick Contacts */}
-          <div className="grid md:grid-cols-2 gap-4 mb-8">
-            <Card>
-              <CardHeader>
-                <CardTitle>📧 Email</CardTitle>
-              </CardHeader>
-              <CardContent className="text-muted-foreground">
-                {loading ? (
-                  <Skeleton className="h-5 w-48" />
-                ) : (
-                  <a href={`mailto:${settings?.supportEmail}`} className="text-primary underline">
-                    {settings?.supportEmail}
-                  </a>
-                )}
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle>💬 WhatsApp</CardTitle>
-              </CardHeader>
-              <CardContent className="text-muted-foreground">
-                {loading ? (
-                  <Skeleton className="h-5 w-40" />
-                ) : (
-                  <a href={`https://wa.me/${settings?.supportWhatsApp}`} target="_blank" rel="noopener noreferrer" className="text-primary underline">
-                    {settings?.supportWhatsApp}
-                  </a>
-                )}
-              </CardContent>
-            </Card>
+      {/* Hero with SVGs */}
+      <section className="relative overflow-hidden">
+        <div className="container mx-auto px-4 pt-14 pb-10 text-center">
+          <div className="absolute -top-8 -right-10 rotate-6">
+            <FloatingBlob />
+          </div>
+          <div className="absolute -bottom-10 -left-10 -rotate-6">
+            <FloatingBlob />
           </div>
 
-          {/* Contact Form */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Kirim Pesan</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form className="grid md:grid-cols-2 gap-4">
-                <div className="md:col-span-1">
-                  <label className="text-sm font-medium">Nama</label>
-                  <Input placeholder="Nama lengkap" />
-                </div>
-                <div className="md:col-span-1">
-                  <label className="text-sm font-medium">Email</label>
-                  <Input type="email" placeholder="email@example.com" />
-                </div>
-                <div className="md:col-span-1">
-                  <label className="text-sm font-medium">No. WhatsApp</label>
-                  <Input placeholder="08xxxxxxxxxx" />
-                </div>
-                <div className="md:col-span-1">
-                  <label className="text-sm font-medium">Subjek</label>
-                  <Input placeholder="Judul pesan" />
-                </div>
-                <div className="md:col-span-2">
-                  <label className="text-sm font-medium">Pesan</label>
-                  <textarea className="w-full border rounded-md p-3 min-h-[120px]" placeholder="Tulis pesan Anda..." />
-                </div>
-                <div className="md:col-span-2 flex justify-end gap-2">
-                  <Button type="button" variant="outline" asChild>
-                    <Link href="/products">← Lihat Produk</Link>
+          <div data-reveal>
+            <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-2">Hubungi Kami</h1>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              Ada pertanyaan? Tim kami siap membantu 24/7 melalui email dan WhatsApp.
+            </p>
+            <div className="mt-4 flex justify-center gap-3">
+              {loading ? (
+                <>
+                  <Skeleton className="h-10 w-36" />
+                  <Skeleton className="h-10 w-36" />
+                </>
+              ) : (
+                <>
+                  <Button asChild>
+                    <a href={`https://wa.me/${settings?.supportWhatsApp}`} target="_blank" rel="noopener noreferrer">💬 WhatsApp</a>
                   </Button>
-                  <Button type="button">Kirim Pesan</Button>
-                </div>
-              </form>
+                  <Button asChild variant="outline">
+                    <a href={`mailto:${settings?.supportEmail}`}>📧 Email</a>
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+        <div className="text-primary/60">
+          <Wave />
+        </div>
+      </section>
+
+      {/* Quick Contact Cards */}
+      <section className="container mx-auto px-4 py-10 grid md:grid-cols-3 gap-4">
+        {[{
+          t: 'Email', d: 'Tanyakan apapun via email.', a: () => loading ? <Skeleton className='h-5 w-48'/> : <a className='text-primary underline' href={`mailto:${settings?.supportEmail}`}>{settings?.supportEmail}</a>
+        },{
+          t: 'WhatsApp', d: 'Respon cepat via WhatsApp.', a: () => loading ? <Skeleton className='h-5 w-40'/> : <a className='text-primary underline' href={`https://wa.me/${settings?.supportWhatsApp}`} target='_blank' rel='noopener noreferrer'>{settings?.supportWhatsApp}</a>
+        },{
+          t: 'Lokasi', d: 'Kantor pusat kami.', a: () => loading ? <Skeleton className='h-5 w-56'/> : <span className='text-muted-foreground'>{settings?.storeLocation || '-'}</span>
+        }].map((c,i)=> (
+          <Card key={i} data-reveal>
+            <CardHeader>
+              <CardTitle>{c.t}</CardTitle>
+            </CardHeader>
+            <CardContent className="text-muted-foreground">
+              <p className="mb-2">{c.d}</p>
+              {c.a()}
             </CardContent>
           </Card>
+        ))}
+      </section>
 
-          {/* About Section */}
-          {settings?.aboutTitle && settings?.aboutDescription && (
-            <Card className="mt-8">
+      {/* FAQ */}
+      <section className="container mx-auto px-4 pb-14">
+        <div className="grid md:grid-cols-2 gap-4" data-reveal>
+          {[['Bagaimana cara memesan?','Pilih produk, tambah ke keranjang, lalu checkout via WhatsApp.'],['Apakah ada garansi?','Kami menyediakan dukungan penuh untuk setiap pemesanan.'],['Metode pembayaran?','WhatsApp order aktif; payment gateway akan menyusul.'],['Berapa lama respon?','Biasanya kurang dari 5 menit di jam operasional.']].map(([q,a])=> (
+            <Card key={q}>
               <CardHeader>
-                <CardTitle>{settings.aboutTitle}</CardTitle>
+                <CardTitle className="text-base">{q}</CardTitle>
               </CardHeader>
-              <CardContent className="text-muted-foreground whitespace-pre-line">
-                {settings.aboutDescription}
-              </CardContent>
+              <CardContent className="text-sm text-muted-foreground">{a}</CardContent>
             </Card>
-          )}
+          ))}
         </div>
       </section>
 
       <footer className="border-t">
         <div className="container mx-auto px-4 py-6 text-center text-sm text-muted-foreground">
-          <div className="mb-2 font-medium">{settings?.storeName || "Store Saya"}</div>
-          <div className="flex justify-center gap-2 flex-wrap">
-            {settings?.storeLocation && <span>📍 {settings.storeLocation}</span>}
-            {settings?.supportEmail && <span>• 📧 {settings.supportEmail}</span>}
+          <div className="flex justify-center gap-3 flex-wrap">
+            {settings?.supportEmail && <span>📧 {settings.supportEmail}</span>}
             {settings?.supportWhatsApp && <span>• 💬 {settings.supportWhatsApp}</span>}
+            {settings?.storeLocation && <span>• 📍 {settings.storeLocation}</span>}
           </div>
+          {settings?.aboutTitle && (
+            <p className="mt-2">{settings.aboutTitle}</p>
+          )}
         </div>
       </footer>
     </div>
