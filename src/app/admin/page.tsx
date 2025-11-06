@@ -1,5 +1,4 @@
 "use client";
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
@@ -17,7 +16,6 @@ export default function AdminDashboard() {
           <p className="text-sm text-muted-foreground">Welcome back, developer</p>
         </div>
       </header>
-
       <main className="container mx-auto px-4 py-6 space-y-6">
         {/* Stats */}
         <div className="grid md:grid-cols-4 gap-4">
@@ -37,7 +35,6 @@ export default function AdminDashboard() {
             );
           })}
         </div>
-
         {/* Quick actions */}
         <Card>
           <CardHeader>
