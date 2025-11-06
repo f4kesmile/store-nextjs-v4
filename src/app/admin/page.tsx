@@ -1,4 +1,5 @@
 "use client";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Package, Eye, AlertTriangle, Wallet, PlusCircle, Users, Receipt, Settings, ChevronRight } from "lucide-react";
@@ -7,7 +8,7 @@ import { formatDate, formatPrice } from "@/lib/utils";
 
 export default function AdminDashboard() {
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-muted/10">
       <header className="sticky top-0 z-30 bg-background/80 backdrop-blur border-b">
         <div className="container mx-auto px-4 py-4">
           <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
@@ -17,7 +18,16 @@ export default function AdminDashboard() {
 
       <main className="container mx-auto px-4 py-6">
         {/* Panel gelap untuk seluruh konten */}
-        <div className="rounded-xl border bg-card text-card-foreground p-6 space-y-6">
+        <div className="rounded-2xl border bg-card text-card-foreground p-6 md:p-8 space-y-6">
+          {/* Section header dalam panel */}
+          <div className="flex items-center justify-between pb-4 border-b">
+            <div>
+              <h2 className="text-xl font-semibold">Dashboard</h2>
+              <p className="text-sm text-muted-foreground">Ringkasan toko Anda</p>
+            </div>
+            <Badge variant="secondary" className="text-[11px]">{formatDate(new Date())}</Badge>
+          </div>
+
           {/* Stats */}
           <div className="grid md:grid-cols-4 gap-4">
             {[{t:"Total Produk",i:Package,v:"0",s:"Semua produk di katalog"},{t:"Produk Aktif",i:Eye,v:"0",s:"Produk yang visible"},{t:"Stock Rendah",i:AlertTriangle,v:"0",s:"Butuh restock"},{t:"Total Revenue",i:Wallet,v:formatPrice(0),s:"Transaksi sukses"}].map((c)=>{
