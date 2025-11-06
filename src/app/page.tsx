@@ -6,6 +6,7 @@ import { SiteNavbar } from "@/components/site-navbar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ShoppingBag, Phone } from "lucide-react";
 
 interface Settings { storeName: string; storeDescription: string; }
 
@@ -29,7 +30,7 @@ export default function HomePage() {
     <div className="min-h-screen bg-background">
       <SiteNavbar />
 
-      {/* Hero (tanpa SVG dekoratif) */}
+      {/* Hero */}
       <section>
         <div className="container mx-auto px-4 py-16 md:py-20">
           <div className="text-center">
@@ -52,10 +53,14 @@ export default function HomePage() {
                 </p>
                 <div className="flex justify-center gap-3">
                   <Button asChild>
-                    <Link href="/products">🛍️ Belanja Sekarang</Link>
+                    <Link href="/products" className="inline-flex items-center gap-2">
+                      <ShoppingBag className="h-4 w-4"/> Belanja Sekarang
+                    </Link>
                   </Button>
                   <Button asChild variant="outline">
-                    <Link href="/contact">📞 Hubungi Kami</Link>
+                    <Link href="/contact" className="inline-flex items-center gap-2">
+                      <Phone className="h-4 w-4"/> Hubungi Kami
+                    </Link>
                   </Button>
                 </div>
               </>
@@ -67,7 +72,7 @@ export default function HomePage() {
       {/* Features */}
       <section className="container mx-auto px-4 py-10">
         <div className="grid md:grid-cols-3 gap-6">
-          {[{t:"Keamanan",i:"shield",d:"Transaksi cepat dengan sistem keamanan terpercaya"},{t:"Premium",i:"gem",d:"Koleksi produk digital berkualitas tinggi"},{t:"Support",i:"handshake",d:"Tim support siap membantu kapan saja"}].map((f,i)=>(
+          {[{t:"Keamanan",d:"Transaksi cepat dengan sistem keamanan terpercaya"},{t:"Premium",d:"Koleksi produk digital berkualitas tinggi"},{t:"Support",d:"Tim support siap membantu kapan saja"}].map((f,i)=>(
             <Card key={i}>
               <CardHeader>
                 <CardTitle>{f.t}</CardTitle>
