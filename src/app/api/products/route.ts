@@ -31,9 +31,14 @@ export async function GET(req: NextRequest) {
     }
 
     return NextResponse.json(products)
-  } catch (error) {
+  } catch (error: any) { // Tambahkan 'any'
+    console.error('💥 GET /api/products FAILED:', error); // <-- TAMBAHKAN INI
+    
     return NextResponse.json(
-      { error: 'Failed to fetch products' },
+      { 
+        error: 'Failed to fetch products', 
+        details: error.message // Kirim detail error ke browser
+      },
       { status: 500 }
     )
   }
