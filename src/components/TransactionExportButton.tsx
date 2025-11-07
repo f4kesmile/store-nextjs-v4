@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Download } from "lucide-react";
-import { toast } from "./ui/use-toast";
+import { toast } from "sonner"; // Ganti import
 
 export default function TransactionExportButton() {
   const handleExport = async () => {
@@ -20,15 +20,14 @@ export default function TransactionExportButton() {
         a.click();
         a.remove();
         window.URL.revokeObjectURL(url);
-        toast({
-          title: "Export Berhasil",
+        toast.success("Export Berhasil", {
           description: "File transaksi sedang diunduh.",
         });
       } else {
-        toast({ title: "Export Gagal", variant: "destructive" });
+        toast.error("Export Gagal");
       }
     } catch (error) {
-      toast({ title: "Terjadi kesalahan", variant: "destructive" });
+      toast.error("Terjadi kesalahan");
     }
   };
 

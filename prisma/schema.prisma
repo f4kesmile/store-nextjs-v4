@@ -38,6 +38,7 @@ model Product {
     name          String
     description   String?        @db.Text
     iconUrl       String?        @map("icon_url")
+    images        ProductImage[]
     stock         Int            @default(0)
     price         Decimal        @db.Decimal(10, 2)
     status        Status         @default(ACTIVE)
@@ -153,4 +154,14 @@ model ActivityLog {
 enum Status {
     ACTIVE
     INACTIVE
+}
+
+model ProductImage {
+    id        Int      @id @default(autoincrement())
+    url       String   @db.Text
+    productId Int      @map("product_id")
+    product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+    createdAt DateTime @default(now()) @map("created_at")
+
+    @@map("product_images")
 }

@@ -1,4 +1,3 @@
-// src/app/api/logs/route.ts (BUKAN di api/auth/logs/)
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -14,6 +13,7 @@ export async function GET() {
     }
 
     const logs = await prisma.activityLog.findMany({
+      take: 100, // MEMBATASI HANYA 100 LOG TERAKHIR AGAR TIDAK MENUMPUK DI UI
       include: {
         user: {
           select: {
@@ -26,13 +26,43 @@ export async function GET() {
       orderBy: {
         timestamp: 'desc',
       },
-      take: 100,
     })
 
     return NextResponse.json(logs)
   } catch (error) {
     return NextResponse.json(
       { error: 'Failed to fetch logs' },
+      { status: 500 }
+    )
+  }
+}
+
+// --- TAMBAHAN: METODE DELETE ---
+export async function DELETE(req: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions)
+
+    // Hanya DEVELOPER yang boleh menghapus log
+    if (!session || session.user.role !== 'DEVELOPER') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    }
+
+    // Hapus semua log
+    await prisma.activityLog.deleteMany({})
+
+    // Opsional: Catat siapa yang menghapus log (akan jadi log pertama setelah bersih)
+    // await prisma.activityLog.create({
+    //   data: {
+    //     userId: parseInt(session.user.id),
+    //     action: "Cleared all activity logs",
+    //   }
+    // })
+
+    return NextResponse.json({ message: 'All logs cleared successfully' })
+  } catch (error) {
+    console.error("Clear logs error:", error)
+    return NextResponse.json(
+      { error: 'Failed to clear logs' },
       { status: 500 }
     )
   }

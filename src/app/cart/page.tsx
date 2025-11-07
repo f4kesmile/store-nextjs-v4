@@ -6,15 +6,27 @@ import { useRouter } from "next/navigation";
 import { useCart } from "@/contexts/CartContext";
 import { SiteNavbar } from "@/components/site-navbar";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
-import { Minus, Plus, Trash2 } from "lucide-react";
-import { toast } from "@/components/ui/use-toast";
+import { Minus, Plus, Trash2, ShoppingBag, ArrowLeft } from "lucide-react"; // Tambah ikon
+import { toast } from "sonner";
 
 export default function CartPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading Cart...</div>}>
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center">
+          Loading Cart...
+        </div>
+      }
+    >
       <CartContent />
     </Suspense>
   );
@@ -37,7 +49,7 @@ function CartContent() {
   const list = useMemo(() => {
     if (!filter.trim()) return cart;
     const q = filter.toLowerCase();
-    return cart.filter(i => i.productName.toLowerCase().includes(q));
+    return cart.filter((i) => i.productName.toLowerCase().includes(q));
   }, [cart, filter]);
 
   const total = getCartTotal();
@@ -50,104 +62,226 @@ function CartContent() {
     <div className="min-h-screen bg-background">
       <SiteNavbar />
 
-      <section className="container mx-auto px-4 py-6">
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Keranjang ({getCartCount()})</h1>
-          <div className="flex items-center gap-2">
-            <Input value={filter} onChange={(e)=>setFilter(e.target.value)} placeholder="Cari di keranjang..." className="w-56" />
-            <Button variant="destructive" onClick={() => { if (confirm("Kosongkan keranjang?")) { clearCart(); toast({ title: "Keranjang dikosongkan" }); } }}>Kosongkan</Button>
-          </div>
+      <section className="container mx-auto px-4 py-6 md:py-8">
+        {/* Header Responsive: Stack di mobile, baris di desktop */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight flex items-center gap-2">
+            <ShoppingBag className="h-6 w-6 hidden md:block" />
+            Keranjang ({getCartCount()})
+          </h1>
+
+          {cart.length > 0 && (
+            <div className="flex w-full md:w-auto items-center gap-2">
+              <div className="relative flex-1 md:w-64">
+                <Input
+                  value={filter}
+                  onChange={(e) => setFilter(e.target.value)}
+                  placeholder="Cari di keranjang..."
+                  className="pr-8"
+                />
+              </div>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => {
+                  if (confirm("Kosongkan keranjang?")) {
+                    clearCart();
+                    toast.success("Keranjang dikosongkan");
+                  }
+                }}
+                className="shrink-0"
+              >
+                <Trash2 className="h-4 w-4 md:mr-2" />
+                <span className="hidden md:inline">Kosongkan</span>
+              </Button>
+            </div>
+          )}
         </div>
 
         {list.length === 0 ? (
-          <Card>
-            <CardContent className="p-8 text-center text-muted-foreground">
-              Keranjang kosong. <Link href="/products" className="text-primary underline">Belanja sekarang</Link>.
+          <Card className="border-dashed">
+            <CardContent className="flex flex-col items-center justify-center p-8 md:p-12 text-center text-muted-foreground">
+              <ShoppingBag className="h-12 w-12 mb-4 opacity-50" />
+              <p className="text-lg font-medium mb-2">
+                Keranjang belanja Anda kosong
+              </p>
+              <p className="text-sm mb-6">
+                Sepertinya Anda belum menambahkan produk apapun.
+              </p>
+              <Button asChild>
+                <Link href="/products">Mulai Belanja</Link>
+              </Button>
             </CardContent>
           </Card>
         ) : (
-          <div className="grid lg:grid-cols-3 gap-6">
-            {/* Items */}
+          <div className="grid lg:grid-cols-3 gap-6 lg:items-start">
+            {/* Daftar Item */}
             <div className="lg:col-span-2 space-y-4">
               {list.map((item) => (
-                <Card key={`${item.productId}-${item.variantId ?? "no"}`}>
+                <Card
+                  key={`${item.productId}-${item.variantId ?? "no"}`}
+                  className="overflow-hidden"
+                >
                   <CardContent className="p-4">
-                    <div className="flex gap-3">
-                      <div className="w-20 h-20 bg-muted/40 rounded-md overflow-hidden flex items-center justify-center">
+                    <div className="flex gap-4">
+                      {/* Gambar Produk */}
+                      <div className="w-20 h-20 sm:w-24 sm:h-24 bg-muted rounded-md overflow-hidden flex items-center justify-center shrink-0 border">
                         {item.productImage ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={item.productImage} alt={item.productName} className="max-h-20 object-contain" />
+                          <img
+                            src={item.productImage}
+                            alt={item.productName}
+                            className="w-full h-full object-cover"
+                          />
                         ) : (
-                          <span className="text-3xl">📦</span>
+                          <span className="text-2xl">📦</span>
                         )}
                       </div>
 
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <p className="font-semibold line-clamp-1">{item.productName}</p>
+                      {/* Detail Produk */}
+                      <div className="flex-1 min-w-0 flex flex-col justify-between">
+                        <div className="flex justify-between gap-2">
+                          <div className="space-y-1">
+                            <p className="font-semibold text-base line-clamp-2">
+                              {item.productName}
+                            </p>
                             {item.variantName && (
-                              <p className="text-xs text-muted-foreground">{item.variantName}: {item.variantValue}</p>
+                              <p className="text-sm text-muted-foreground bg-muted px-2 py-0.5 rounded-md inline-block">
+                                {item.variantName}: {item.variantValue}
+                              </p>
                             )}
                           </div>
-                          <Button variant="ghost" className="text-destructive" onClick={() => { removeFromCart(item.productId, item.variantId); toast({ title: "Item dihapus", description: item.productName }); }}>
-                            <Trash2 className="h-4 w-4"/>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-muted-foreground hover:text-destructive -mt-1 -mr-2 shrink-0"
+                            onClick={() => {
+                              removeFromCart(item.productId, item.variantId);
+                              toast.success("Item dihapus");
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
 
-                        <div className="mt-3 flex items-center gap-2">
-                          <Button size="icon" variant="outline" onClick={() => { updateQuantity(item.productId, item.quantity - 1, item.variantId); toast({ title: "Jumlah diubah", description: `${item.productName}: ${item.quantity - 1}` }); }}><Minus className="h-4 w-4"/></Button>
-                          <Input value={item.quantity} onChange={(e)=>{
-                            const v = parseInt(e.target.value)||1;
-                            updateQuantity(item.productId, v, item.variantId);
-                            toast({ title: "Jumlah diubah", description: `${item.productName}: ${v}` });
-                          }} className="w-16 text-center" />
-                          <Button size="icon" variant="outline" onClick={() => { updateQuantity(item.productId, item.quantity + 1, item.variantId); toast({ title: "Jumlah diubah", description: `${item.productName}: ${item.quantity + 1}` }); }}><Plus className="h-4 w-4"/></Button>
-                          <span className="text-xs text-muted-foreground">Max: {item.maxStock}</span>
-                        </div>
-
-                        {item.enableNotes !== false && (
-                          <div className="mt-3">
-                            <Input
-                              placeholder="Catatan (opsional)"
-                              value={item.notes || ""}
-                              onChange={(e)=>updateNotes(item.productId, e.target.value, item.variantId)}
-                            />
+                        {/* Kontrol Kuantitas & Harga Mobile */}
+                        <div className="flex flex-wrap items-end justify-between gap-3 mt-4">
+                          <div className="flex items-center border rounded-md shrink-0">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 rounded-none"
+                              onClick={() =>
+                                updateQuantity(
+                                  item.productId,
+                                  item.quantity - 1,
+                                  item.variantId
+                                )
+                              }
+                              disabled={item.quantity <= 1}
+                            >
+                              <Minus className="h-3 w-3" />
+                            </Button>
+                            <div className="w-10 text-center text-sm font-medium">
+                              {item.quantity}
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 rounded-none"
+                              onClick={() =>
+                                updateQuantity(
+                                  item.productId,
+                                  item.quantity + 1,
+                                  item.variantId
+                                )
+                              }
+                              disabled={item.quantity >= item.maxStock}
+                            >
+                              <Plus className="h-3 w-3" />
+                            </Button>
                           </div>
-                        )}
-                      </div>
 
-                      <div className="text-right w-32">
-                        <p className="text-xs text-muted-foreground">Subtotal</p>
-                        <p className="font-semibold">Rp {(item.productPrice * item.quantity).toLocaleString("id-ID")}</p>
+                          <div className="text-right">
+                            <p className="text-sm text-muted-foreground font-medium">
+                              Rp {item.productPrice.toLocaleString("id-ID")} x{" "}
+                              {item.quantity}
+                            </p>
+                            <p className="font-bold text-primary">
+                              Rp{" "}
+                              {(
+                                item.productPrice * item.quantity
+                              ).toLocaleString("id-ID")}
+                            </p>
+                          </div>
+                        </div>
                       </div>
                     </div>
+
+                    {/* Catatan (Opsional) */}
+                    {item.enableNotes !== false && (
+                      <div className="mt-4 pt-3 border-t">
+                        <Input
+                          placeholder="Tulis catatan untuk produk ini (opsional)..."
+                          value={item.notes || ""}
+                          onChange={(e) =>
+                            updateNotes(
+                              item.productId,
+                              e.target.value,
+                              item.variantId
+                            )
+                          }
+                          className="text-sm bg-muted/50 border-transparent focus-visible:bg-background focus-visible:border-input"
+                        />
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               ))}
             </div>
 
-            {/* Summary */}
-            <div className="lg:col-span-1">
-              <Card className="sticky top-6">
-                <CardHeader>
-                  <CardTitle>Ringkasan</CardTitle>
+            {/* Ringkasan Pesanan - Sticky di Desktop */}
+            <div className="lg:col-span-1 lg:sticky lg:top-20">
+              <Card>
+                <CardHeader className="pb-4">
+                  <CardTitle className="text-lg">Ringkasan Pesanan</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span>Total Item</span>
-                    <span className="font-medium">{getCartCount()}</span>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Total Item</span>
+                      <span>{getCartCount()} pcs</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">
+                        Subtotal Produk
+                      </span>
+                      <span>Rp {total.toLocaleString("id-ID")}</span>
+                    </div>
                   </div>
                   <Separator />
-                  <div className="flex justify-between text-lg font-semibold">
-                    <span>Total</span>
-                    <span className="text-primary">Rp {total.toLocaleString("id-ID")}</span>
+                  <div className="flex justify-between items-center">
+                    <span className="font-semibold">Total Bayar</span>
+                    <span className="text-xl font-bold text-primary">
+                      Rp {total.toLocaleString("id-ID")}
+                    </span>
                   </div>
                 </CardContent>
-                <CardFooter className="flex flex-col gap-2">
-                  <Button className="w-full" onClick={handleCheckout} disabled={getCartCount() === 0}>Checkout</Button>
+                <CardFooter className="flex flex-col gap-3 pt-2">
+                  <Button
+                    className="w-full"
+                    size="lg"
+                    onClick={handleCheckout}
+                    disabled={getCartCount() === 0}
+                  >
+                    Checkout Sekarang
+                  </Button>
                   <Button variant="outline" className="w-full" asChild>
-                    <Link href="/products">← Lanjut Belanja</Link>
+                    <Link
+                      href="/products"
+                      className="inline-flex items-center justify-center"
+                    >
+                      <ArrowLeft className="h-4 w-4 mr-2" /> Lanjut Belanja
+                    </Link>
                   </Button>
                 </CardFooter>
               </Card>

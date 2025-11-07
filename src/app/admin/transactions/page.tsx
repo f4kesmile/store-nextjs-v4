@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { toast } from "@/components/ui/use-toast";
+import { toast } from "sonner"; // Ganti import
 import AdminCard from "@/components/admin/shared/AdminCard";
 import AdminTable from "@/components/admin/shared/AdminTable";
 import {
@@ -81,11 +81,11 @@ export default function TransactionsPage() {
         const data = await res.json();
         setTransactions(data);
       } else {
-        toast({ title: "Gagal memuat transaksi", variant: "destructive" });
+        toast.error("Gagal memuat transaksi");
       }
     } catch (error) {
       console.error(error);
-      toast({ title: "Terjadi kesalahan", variant: "destructive" });
+      toast.error("Terjadi kesalahan");
     } finally {
       setLoading(false);
     }
@@ -108,25 +108,20 @@ export default function TransactionsPage() {
       });
 
       if (res.ok) {
-        toast({
-          title: "Berhasil",
+        toast.success("Berhasil", {
           description: "Transaksi berhasil diupdate.",
         });
         setShowModal(false);
         setEditingTransaction(null);
         fetchTransactions(); // Muat ulang data
       } else {
-        toast({
-          title: "Gagal",
+        toast.error("Gagal", {
           description: "Gagal mengupdate transaksi.",
-          variant: "destructive",
         });
       }
     } catch (error) {
-      toast({
-        title: "Error",
+      toast.error("Error", {
         description: "Terjadi kesalahan.",
-        variant: "destructive",
       });
     }
   };
@@ -137,20 +132,16 @@ export default function TransactionsPage() {
     try {
       const res = await fetch(`/api/transactions/${id}`, { method: "DELETE" });
       if (res.ok) {
-        toast({ title: "Berhasil", description: "Transaksi dihapus." });
+        toast.success("Berhasil", { description: "Transaksi dihapus." });
         fetchTransactions(); // Muat ulang data
       } else {
-        toast({
-          title: "Gagal",
+        toast.error("Gagal", {
           description: "Gagal menghapus transaksi.",
-          variant: "destructive",
         });
       }
     } catch (error) {
-      toast({
-        title: "Error",
+      toast.error("Error", {
         description: "Terjadi kesalahan.",
-        variant: "destructive",
       });
     }
   };

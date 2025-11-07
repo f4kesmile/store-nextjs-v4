@@ -1,5 +1,12 @@
 "use client";
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  ReactNode,
+} from "react";
+import { useTheme } from "next-themes"; // <-- PERBAIKAN 1: Import useTheme
 
 export type StoreSettings = {
   storeName: string;
@@ -42,14 +49,26 @@ type Ctx = {
 
 const SettingsCtx = createContext<Ctx | null>(null);
 
-// cache sederhana di client agar pindah halaman tidak selalu fetch
 let cachedSettings: StoreSettings | null = null;
 let cacheTime: number = 0;
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
-export function SettingsProvider({ children, initial }: { children: ReactNode; initial?: StoreSettings | null }) {
-  const [settings, setSettings] = useState<StoreSettings>(initial || cachedSettings || defaultSettings);
-  const [loading, setLoading] = useState<boolean>(!initial && (!cachedSettings || Date.now() - cacheTime > CACHE_DURATION));
+export function SettingsProvider({
+  children,
+  initial,
+}: {
+  children: ReactNode;
+  initial?: StoreSettings | null;
+}) {
+  const [settings, setSettings] = useState<StoreSettings>(
+    initial || cachedSettings || defaultSettings
+  );
+  const [loading, setLoading] = useState<boolean>(
+    !initial && (!cachedSettings || Date.now() - cacheTime > CACHE_DURATION)
+  );
+
+  // --- PERBAIKAN 2: Dapatkan fungsi setTheme dari next-themes ---
+  const { setTheme } = useTheme();
 
   useEffect(() => {
     if (initial) {
@@ -58,13 +77,13 @@ export function SettingsProvider({ children, initial }: { children: ReactNode; i
       setLoading(false);
       return;
     }
-    
+
     if (cachedSettings && Date.now() - cacheTime < CACHE_DURATION) {
       setSettings(cachedSettings);
       setLoading(false);
       return;
     }
-    
+
     let abort = false;
     (async () => {
       try {
@@ -77,17 +96,25 @@ export function SettingsProvider({ children, initial }: { children: ReactNode; i
           setSettings(data);
         }
       } catch (error) {
-        console.error('Failed to load settings:', error);
-        // fallback tetap default
+        console.error("Failed to load settings:", error);
       } finally {
         if (!abort) setLoading(false);
       }
     })();
-    
+
     return () => {
       abort = true;
     };
   }, [initial]);
+
+  // --- PERBAIKAN 3: Sinkronkan tema saat settings dimuat ---
+  useEffect(() => {
+    if (!loading && settings.theme) {
+      // Terapkan tema yang dimuat dari database ke next-themes
+      setTheme(settings.theme);
+    }
+    // Kita juga tambahkan setTheme sebagai dependensi
+  }, [settings.theme, loading, setTheme]);
 
   const refresh = async () => {
     const res = await fetch("/api/settings", { cache: "no-store" });
@@ -102,12 +129,20 @@ export function SettingsProvider({ children, initial }: { children: ReactNode; i
       const next = { ...prev, ...s };
       cachedSettings = next;
       cacheTime = Date.now();
+
+      // --- PERBAIKAN 4: Langsung ubah tema saat di-update dari admin ---
+      if (s.theme) {
+        setTheme(s.theme);
+      }
+
       return next;
     });
   };
 
   return (
-    <SettingsCtx.Provider value={{ settings, loading, refresh, setSettingsLocal }}>
+    <SettingsCtx.Provider
+      value={{ settings, loading, refresh, setSettingsLocal }}
+    >
       <ThemeVariables settings={settings} />
       {children}
     </SettingsCtx.Provider>
@@ -120,7 +155,6 @@ export function useSettings() {
   return ctx;
 }
 
-// Inject CSS variable untuk warna
 function ThemeVariables({ settings }: { settings: StoreSettings }) {
   return (
     <style
@@ -128,13 +162,22 @@ function ThemeVariables({ settings }: { settings: StoreSettings }) {
       dangerouslySetInnerHTML={{
         __html: `
         :root {
+          /* PERBAIKAN: 
+            Ganti '--brand-primary' menjadi '--primary' 
+            Ganti '--brand-secondary' menjadi '--secondary'
+            Ini akan menimpa default HSL dari globals.css dengan HEX dari database.
+          */
+          --primary: ${settings.primaryColor};
+          --secondary: ${settings.secondaryColor};
+
+          /* (Variabel di bawah ini tidak lagi diperlukan, tapi tidak masalah jika tetap ada) */
           --brand-primary: ${settings.primaryColor};
           --brand-secondary: ${settings.secondaryColor};
         }
-        .brand-primary { color: var(--brand-primary) !important; }
-        .bg-brand-primary { background: var(--brand-primary) !important; }
-        .border-brand-primary { border-color: var(--brand-primary) !important; }
-        .bg-brand-soft { background: color-mix(in srgb, var(--brand-primary) 10%, white) !important; }
+        .brand-primary { color: var(--primary) !important; }
+        .bg-brand-primary { background: var(--primary) !important; }
+        .border-brand-primary { border-color: var(--primary) !important; }
+        .bg-brand-soft { background: color-mix(in srgb, var(--primary) 10%, white) !important; }
       `,
       }}
     />

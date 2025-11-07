@@ -1,48 +1,63 @@
-// src/components/ProductCard.tsx
 import React from "react";
-import Image from "next/image";
+import ImageWithFallback from "@/components/ImageWithFallback";
+import { Badge } from "@/components/ui/badge";
 
 interface ProductCardProps {
   product: {
     id: number;
     name: string;
-    description: string;
+    description: string | null;
     price: number;
-    iconUrl: string;
+    iconUrl: string | null;
     stock: number;
   };
   onClick?: () => void;
 }
 
 export function ProductCard({ product, onClick }: ProductCardProps) {
+  const formatRupiah = (amount: number) =>
+    new Intl.NumberFormat("id-ID", {
+      style: "currency",
+      currency: "IDR",
+      maximumFractionDigits: 0,
+    }).format(amount);
+
   return (
     <div
       onClick={onClick}
-      className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-2xl transform hover:scale-105 transition-all duration-300 cursor-pointer"
+      className="group bg-card border rounded-xl overflow-hidden hover:shadow-lg transition-all duration-300 cursor-pointer flex flex-col h-full"
     >
-      <div className="h-48 bg-gradient-to-br from-purple-400 to-blue-400 flex items-center justify-center">
-        {product.iconUrl ? (
-          <img
-            src={product.iconUrl}
-            alt={product.name}
-            className="h-32 w-32 object-contain"
-          />
-        ) : (
-          <div className="text-6xl">📦</div>
+      {/* Bagian Gambar dengan Aspek Rasio Tetap & Optimasi */}
+      <div className="relative aspect-square bg-muted overflow-hidden">
+        <ImageWithFallback
+          src={product.iconUrl}
+          alt={product.name}
+          fill={true}
+          className="object-cover transition-transform duration-500 group-hover:scale-105"
+        />
+        {product.stock <= 0 && (
+          <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+            <Badge variant="destructive" className="text-base px-4 py-1">
+              Stok Habis
+            </Badge>
+          </div>
         )}
       </div>
-      <div className="p-4">
-        <h3 className="text-xl font-bold mb-2 text-gray-800 line-clamp-1">
+
+      {/* Bagian Informasi */}
+      <div className="p-4 flex flex-col flex-1">
+        <h3 className="font-semibold text-base line-clamp-2 mb-1 group-hover:text-primary transition-colors">
           {product.name}
         </h3>
-        <p className="text-gray-600 text-sm mb-3 line-clamp-2">
-          {product.description}
-        </p>
-        <div className="flex justify-between items-center">
-          <span className="text-2xl font-bold text-purple-600">
-            Rp {product.price.toLocaleString("id-ID")}
+
+        {/* Harga & Stok */}
+        <div className="mt-auto pt-2 flex items-center justify-between">
+          <p className="text-lg font-bold text-primary">
+            {formatRupiah(product.price)}
+          </p>
+          <span className="text-xs text-muted-foreground">
+            {product.stock > 0 ? `Stok: ${product.stock}` : null}
           </span>
-          <span className="text-sm text-gray-500">Stok: {product.stock}</span>
         </div>
       </div>
     </div>

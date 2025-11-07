@@ -1,157 +1,602 @@
-'use client';
+"use client";
 
-import React, { useMemo, useState } from 'react';
-import AdminCard from '../../../components/admin/shared/AdminCard';
-import AdminDialog from '../../../components/admin/shared/AdminDialog';
-import AdminTable from '../../../components/admin/shared/AdminTable';
-import { StatusBadge, ActionDropdown, FormGrid, createCommonActions } from '../../../components/admin/shared/AdminComponents';
-import { Button } from '../../../components/ui/button';
-import { Input } from '../../../components/ui/input';
-import { Label } from '../../../components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/select';
-import { Textarea } from '../../../components/ui/textarea';
-import { Package, Plus, Package2 } from 'lucide-react';
+import React, { useMemo, useState, useEffect } from "react";
+import AdminCard from "@/components/admin/shared/AdminCard";
+import AdminDialog from "@/components/admin/shared/AdminDialog";
+import AdminTable from "@/components/admin/shared/AdminTable";
+import {
+  StatusBadge,
+  ActionDropdown,
+  FormGrid,
+  createCommonActions,
+} from "@/components/admin/shared/AdminComponents";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Package,
+  Plus,
+  Package2,
+  Image as ImageIcon,
+  Loader2,
+  Upload,
+  X,
+} from "lucide-react";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+import ImageWithFallback from "@/components/ImageWithFallback";
 
+// Interface sesuai schema baru
+interface ProductImage {
+  id: number;
+  url: string;
+}
 interface Product {
   id: number;
   name: string;
-  sku: string;
-  category: string;
-  price: number;
+  description: string | null;
+  iconUrl: string | null;
+  images: ProductImage[]; // Tambahan untuk galeri
   stock: number;
-  status: string;
-  description?: string;
+  price: number;
+  status: "ACTIVE" | "INACTIVE";
+  enableNotes: boolean;
   createdAt: string;
 }
 
-const formatRupiah = (amount: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(amount);
+// Tipe form data diperbarui untuk menampung array URL galeri
+type ProductFormData = Partial<Omit<Product, "images">> & {
+  galleryUrls?: string[];
+};
+
+const formatRupiah = (amount: number) =>
+  new Intl.NumberFormat("id-ID", {
+    style: "currency",
+    currency: "IDR",
+    maximumFractionDigits: 0,
+  }).format(amount);
 
 const ProductsPage: React.FC = () => {
-  const [products] = useState<Product[]>([
-    { id: 1, name: 'Wireless Headphones', sku: 'WH-001', category: 'Electronics', price: 299000, stock: 45, status: 'active', description: 'High-quality wireless headphones with noise cancellation', createdAt: '2024-01-15' },
-    { id: 2, name: 'Gaming Mouse', sku: 'GM-002', category: 'Electronics', price: 150000, stock: 0, status: 'out_of_stock', description: 'Professional gaming mouse with RGB lighting', createdAt: '2024-02-20' },
-    { id: 3, name: 'Coffee Mug', sku: 'CM-003', category: 'Home & Garden', price: 45000, stock: 120, status: 'active', description: 'Ceramic coffee mug with elegant design', createdAt: '2024-03-10' },
-  ]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [selectedProduct, setSelectedProduct] =
+    useState<ProductFormData | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isCreateMode, setIsCreateMode] = useState(false);
-  const [searchValue, setSearchValue] = useState('');
+  const [searchValue, setSearchValue] = useState("");
 
-  const handleCreateProduct = () => { setSelectedProduct(null); setIsCreateMode(true); setIsDialogOpen(true); };
-  const handleEditProduct   = (product: Product) => { setSelectedProduct(product); setIsCreateMode(false); setIsDialogOpen(true); };
-  const handleViewProduct   = (product: Product) => { setSelectedProduct(product); setIsCreateMode(false); setIsDialogOpen(true); };
-  const handleDeleteProduct = (product: Product) => { if (confirm(`Hapus ${product.name}?`)) console.log('Delete product:', product.id); };
+  // State loading terpisah
+  const [uploadingIcon, setUploadingIcon] = useState(false);
+  const [uploadingGallery, setUploadingGallery] = useState(false);
 
-  const formatDate = (dateString: string) => new Date(dateString).toLocaleDateString('id-ID', { year: 'numeric', month: 'short', day: 'numeric' });
-  const getStockStatus = (stock: number) => (stock === 0 ? 'out_of_stock' : stock < 10 ? 'low_stock' : 'in_stock');
+  const fetchProducts = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/products?admin=true");
+      if (res.ok) {
+        const data = await res.json();
+        setProducts(data);
+      } else {
+        toast.error("Gagal memuat produk");
+      }
+    } catch (error) {
+      toast.error("Terjadi kesalahan koneksi");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchProducts();
+  }, []);
+
+  const handleCreateProduct = () => {
+    setSelectedProduct({
+      name: "",
+      description: "",
+      iconUrl: "",
+      galleryUrls: [], // Reset galeri
+      price: 0,
+      stock: 0,
+      status: "ACTIVE",
+      enableNotes: true,
+    });
+    setIsCreateMode(true);
+    setIsDialogOpen(true);
+  };
+
+  const handleEditProduct = (product: Product) => {
+    // Saat edit, kita ambil URL dari array images
+    setSelectedProduct({
+      ...product,
+      galleryUrls: product.images.map((img) => img.url),
+    });
+    setIsCreateMode(false);
+    setIsDialogOpen(true);
+  };
+
+  const handleDeleteProduct = async (product: Product) => {
+    if (confirm(`Anda yakin ingin menghapus produk ${product.name}?`)) {
+      try {
+        const res = await fetch(`/api/products/${product.id}`, {
+          method: "DELETE",
+        });
+        if (res.ok) {
+          toast.success("Produk dihapus");
+          fetchProducts();
+        } else {
+          toast.error("Gagal menghapus produk");
+        }
+      } catch (error) {
+        toast.error("Terjadi kesalahan");
+      }
+    }
+  };
+
+  const handleSaveProduct = async () => {
+    if (!selectedProduct) return;
+
+    const url = isCreateMode
+      ? "/api/products"
+      : `/api/products/${selectedProduct.id}`;
+    const method = isCreateMode ? "POST" : "PUT";
+
+    // Siapkan payload, termasuk images (galeri)
+    const payload = {
+      ...selectedProduct,
+      price: parseFloat(String(selectedProduct.price)) || 0,
+      stock: parseInt(String(selectedProduct.stock)) || 0,
+      images: selectedProduct.galleryUrls || [], // Kirim array URL galeri
+    };
+
+    try {
+      const res = await fetch(url, {
+        method: method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        toast.success(isCreateMode ? "Produk dibuat" : "Produk diperbarui");
+        setIsDialogOpen(false);
+        fetchProducts();
+      } else {
+        const err = await res.json();
+        toast.error("Gagal menyimpan", { description: err.error });
+      }
+    } catch (error) {
+      toast.error("Terjadi kesalahan koneksi");
+    }
+  };
+
+  const handleDialogChange = (field: keyof ProductFormData, value: any) => {
+    setSelectedProduct((prev) => (prev ? { ...prev, [field]: value } : null));
+  };
+
+  // Upload untuk Icon Utama (Single)
+  const handleIconUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setUploadingIcon(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+      if (!res.ok) throw new Error("Gagal upload");
+      const data = await res.json();
+      handleDialogChange("iconUrl", data.imageUrl);
+      toast.success("Cover berhasil diupload");
+    } catch (error) {
+      toast.error("Upload cover gagal");
+    } finally {
+      setUploadingIcon(false);
+      event.target.value = "";
+    }
+  };
+
+  // Upload untuk Galeri (Multiple)
+  const handleGalleryUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    setUploadingGallery(true);
+    const newUrls: string[] = [];
+
+    try {
+      // Upload satu per satu (bisa dioptimalkan dengan Promise.all jika API mendukung multiple files)
+      for (let i = 0; i < files.length; i++) {
+        const formData = new FormData();
+        formData.append("file", files[i]);
+        const res = await fetch("/api/upload", {
+          method: "POST",
+          body: formData,
+        });
+        if (res.ok) {
+          const data = await res.json();
+          newUrls.push(data.imageUrl);
+        }
+      }
+
+      // Tambahkan URL baru ke state galeri yang sudah ada
+      setSelectedProduct((prev) =>
+        prev
+          ? {
+              ...prev,
+              galleryUrls: [...(prev.galleryUrls || []), ...newUrls],
+            }
+          : null
+      );
+
+      if (newUrls.length > 0)
+        toast.success(`${newUrls.length} gambar ditambahkan ke galeri`);
+    } catch (error) {
+      toast.error("Sebagian upload galeri gagal");
+    } finally {
+      setUploadingGallery(false);
+      event.target.value = "";
+    }
+  };
+
+  const removeGalleryImage = (indexToRemove: number) => {
+    setSelectedProduct((prev) =>
+      prev
+        ? {
+            ...prev,
+            galleryUrls: prev.galleryUrls?.filter(
+              (_, index) => index !== indexToRemove
+            ),
+          }
+        : null
+    );
+  };
+
+  const isUploading = uploadingIcon || uploadingGallery;
+
+  // ... (Kolom tabel dan filter sama seperti sebelumnya) ...
+  const getStockStatus = (stock: number) =>
+    stock === 0 ? "out_of_stock" : stock < 10 ? "low_stock" : "in_stock";
+  const formatDate = (d: string) =>
+    new Date(d).toLocaleDateString("id-ID", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
 
   const columns = [
-    { key: 'name', label: 'Produk', render: (value: string, product: Product) => (
-      <div className="flex items-center gap-3">
-        <div className="w-9 h-9 bg-indigo-500/15 rounded-md flex items-center justify-center">
-          <Package className="w-4.5 h-4.5 text-indigo-400" />
+    {
+      key: "name",
+      label: "Produk",
+      render: (value: string, product: Product) => (
+        <div className="flex items-center gap-3">
+          {/* Gunakan komponen baru kita di sini */}
+          <div className="relative w-10 h-10 rounded-md overflow-hidden border bg-muted shrink-0">
+            <ImageWithFallback
+              src={product.iconUrl}
+              alt={product.name}
+              fill={true} // Gunakan mode 'fill' agar otomatis memenuhi kotak induknya
+              className="object-cover"
+            />
+          </div>
+          <div>
+            <p className="font-medium text-[hsl(var(--foreground))] line-clamp-1">
+              {value}
+            </p>
+            <p className="text-xs text-[hsl(var(--muted-foreground))]">
+              ID: {product.id}
+            </p>
+          </div>
         </div>
-        <div>
-          <p className="font-medium text-white/95">{value}</p>
-          <p className="text-xs text-white/50">{product.sku}</p>
+      ),
+    },
+    {
+      key: "price",
+      label: "Harga",
+      render: (v: number) => (
+        <span className="font-medium">{formatRupiah(v)}</span>
+      ),
+    },
+    {
+      key: "stock",
+      label: "Stok",
+      render: (v: number) => (
+        <div className="flex items-center gap-2">
+          <Package2 className="w-4 h-4 text-muted-foreground" />
+          <span className="font-medium">{v}</span>
+          <StatusBadge status={getStockStatus(v)} />
         </div>
-      </div>
-    ) },
-    { key: 'category', label: 'Kategori', render: (v: string) => <span className="text-sm text-white/70">{v}</span> },
-    { key: 'price', label: 'Harga', render: (v: number) => <span className="font-medium">{formatRupiah(v)}</span> },
-    { key: 'stock', label: 'Stok', render: (v: number) => (
-      <div className="flex items-center gap-2">
-        <Package2 className="w-4 h-4 text-white/50" />
-        <span className="font-medium">{v}</span>
-        <StatusBadge status={getStockStatus(v)} />
-      </div>
-    ) },
-    { key: 'status', label: 'Status', render: (v: string) => <StatusBadge status={v} /> },
-    { key: 'createdAt', label: 'Dibuat', className: 'hidden lg:table-cell', render: (v: string) => <span className="text-sm text-white/60">{formatDate(v)}</span> },
-    { key: 'actions', label: 'Aksi', className: 'w-10', render: (_: unknown, p: Product) => (
-      <ActionDropdown actions={createCommonActions.crud(() => handleViewProduct(p), () => handleEditProduct(p), () => handleDeleteProduct(p))} />
-    ) },
+      ),
+    },
+    {
+      key: "status",
+      label: "Status",
+      render: (v: string) => <StatusBadge status={v} />,
+    },
+    {
+      key: "createdAt",
+      label: "Dibuat",
+      className: "hidden lg:table-cell",
+      render: (v: string) => (
+        <span className="text-sm text-muted-foreground">{formatDate(v)}</span>
+      ),
+    },
+    {
+      key: "actions",
+      label: "",
+      className: "w-10",
+      render: (_: any, p: Product) => (
+        <ActionDropdown
+          actions={createCommonActions.crud(
+            undefined,
+            () => handleEditProduct(p),
+            () => handleDeleteProduct(p)
+          )}
+        />
+      ),
+    },
   ];
 
-  const filteredProducts = useMemo(() => products.filter(p => [p.name, p.sku, p.category].some(x => x.toLowerCase().includes(searchValue.toLowerCase()))), [products, searchValue]);
+  const filteredProducts = useMemo(
+    () =>
+      products.filter((p) =>
+        [p.name].some((x) =>
+          x.toLowerCase().includes(searchValue.toLowerCase())
+        )
+      ),
+    [products, searchValue]
+  );
 
   return (
-    <div className="min-h-screen bg-[hsl(var(--background))] p-4 sm:p-6 text-[hsl(var(--foreground))]">
-      <div className="admin-container space-y-6">
-        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-start sm:items-center justify-between">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-semibold">Produk</h1>
-            <p className="text-white/60 mt-1">Kelola katalog produk kamu</p>
-          </div>
-          <div className="flex gap-2">
-            <Button onClick={handleCreateProduct} className="flex items-center gap-2">
-              <Plus className="w-4 h-4" /> Tambah
-            </Button>
-          </div>
+    <div className="min-h-screen p-4 sm:p-6">
+      <div className="max-w-7xl mx-auto space-y-6">
+        <div className="flex justify-between items-center">
+          <h1 className="text-2xl font-bold">Produk</h1>
+          <Button onClick={handleCreateProduct} className="gap-2">
+            <Plus className="w-4 h-4" /> Tambah
+          </Button>
         </div>
 
-        <div className="admin-section">
-          <div className="admin-section-header">
-            <div className="relative w-full sm:w-80">
-              <Input placeholder="Cari nama, SKU..." value={searchValue} onChange={(e) => setSearchValue(e.target.value)} className="bg-[hsl(var(--accent))] border-[hsl(var(--border))] placeholder:text-white/40" />
-            </div>
-          </div>
-          <div className="admin-section-content">
-            <AdminTable columns={columns} data={filteredProducts} searchable={false} />
-          </div>
-        </div>
+        <AdminCard
+          title="Semua Produk"
+          description={`${filteredProducts.length} produk ditemukan`}
+        >
+          <AdminTable
+            columns={columns}
+            data={filteredProducts}
+            loading={loading}
+            searchable
+            searchValue={searchValue}
+            onSearchChange={setSearchValue}
+            searchPlaceholder="Cari produk..."
+          />
+        </AdminCard>
 
         <AdminDialog
           open={isDialogOpen}
           onOpenChange={setIsDialogOpen}
-          title={isCreateMode ? 'Produk Baru' : selectedProduct ? `Edit ${selectedProduct.name}` : 'Detail Produk'}
-          description={isCreateMode ? 'Tambah produk ke katalog' : 'Ubah informasi produk'}
+          title={isCreateMode ? "Produk Baru" : "Edit Produk"}
           size="lg"
-          footer={(
-            <div className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-3">
-              <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Batal</Button>
-              <Button>{isCreateMode ? 'Simpan' : 'Update'}</Button>
+          footer={
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+                Batal
+              </Button>
+              <Button onClick={handleSaveProduct} disabled={isUploading}>
+                {isUploading ? "Mengupload..." : "Simpan"}
+              </Button>
             </div>
-          )}
+          }
         >
-          <div className="admin-grid md:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="name">Nama Produk</Label>
-              <Input id="name" defaultValue={selectedProduct?.name || ''} className="bg-[hsl(var(--accent))] border-[hsl(var(--border))]" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="sku">SKU</Label>
-              <Input id="sku" defaultValue={selectedProduct?.sku || ''} className="bg-[hsl(var(--accent))] border-[hsl(var(--border))]" />
-            </div>
-            <div className="space-y-2">
-              <Label>Kategori</Label>
-              <Input readOnly value={selectedProduct?.category || ''} className="bg-[hsl(var(--accent))] border-[hsl(var(--border))]" />
-            </div>
-            <div className="space-y-2">
-              <Label>Status</Label>
-              <Select value={selectedProduct?.status || 'active'} onValueChange={() => {}}>
-                <SelectTrigger><SelectValue placeholder="Pilih status" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
-                  <SelectItem value="discontinued">Discontinued</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Harga (IDR)</Label>
-              <Input type="number" defaultValue={selectedProduct?.price || ''} className="bg-[hsl(var(--accent))] border-[hsl(var(--border))]" />
-            </div>
-            <div className="space-y-2">
-              <Label>Stok</Label>
-              <Input type="number" defaultValue={selectedProduct?.stock || ''} className="bg-[hsl(var(--accent))] border-[hsl(var(--border))]" />
-            </div>
-            <div className="md:col-span-2 space-y-2">
-              <Label>Deskripsi</Label>
-              <Textarea rows={4} defaultValue={selectedProduct?.description || ''} className="bg-[hsl(var(--accent))] border-[hsl(var(--border))]" />
-            </div>
-          </div>
+          {selectedProduct && (
+            <FormGrid columns={2}>
+              <div className="space-y-2 md:col-span-2">
+                <Label>Nama Produk</Label>
+                <Input
+                  value={selectedProduct.name || ""}
+                  onChange={(e) => handleDialogChange("name", e.target.value)}
+                  disabled={isUploading}
+                />
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <Label>Deskripsi</Label>
+                <Textarea
+                  rows={3}
+                  value={selectedProduct.description || ""}
+                  onChange={(e) =>
+                    handleDialogChange("description", e.target.value)
+                  }
+                  disabled={isUploading}
+                />
+              </div>
+
+              {/* --- COVER IMAGE (SINGLE) --- */}
+              <div className="space-y-2">
+                <Label>Cover Utama</Label>
+                <div className="flex items-start gap-3">
+                  <div className="w-20 h-20 bg-muted rounded-md flex items-center justify-center overflow-hidden shrink-0 border">
+                    {selectedProduct.iconUrl ? (
+                      <img
+                        src={selectedProduct.iconUrl}
+                        alt="Cover"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <ImageIcon className="w-8 h-8 text-muted-foreground" />
+                    )}
+                  </div>
+                  <div className="w-full space-y-2">
+                    <Input
+                      value={selectedProduct.iconUrl || ""}
+                      onChange={(e) =>
+                        handleDialogChange("iconUrl", e.target.value)
+                      }
+                      placeholder="URL Cover"
+                      disabled={isUploading}
+                    />
+                    <div className="flex gap-2">
+                      <Input
+                        id="icon-upload"
+                        type="file"
+                        accept="image/*"
+                        onChange={handleIconUpload}
+                        disabled={isUploading}
+                        className="hidden"
+                      />
+                      <Label
+                        htmlFor="icon-upload"
+                        className={cn(
+                          "inline-flex h-9 items-center justify-center rounded-md border bg-background px-3 text-xs font-medium transition-colors hover:bg-accent cursor-pointer gap-2",
+                          isUploading && "opacity-50"
+                        )}
+                      >
+                        {uploadingIcon ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : (
+                          <Upload className="w-3 h-3" />
+                        )}{" "}
+                        Upload Cover
+                      </Label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* --- GALLERY IMAGES (MULTIPLE) --- */}
+              <div className="space-y-2">
+                <Label>
+                  Galeri ({selectedProduct.galleryUrls?.length || 0})
+                </Label>
+                <div className="space-y-3">
+                  {/* Area Upload Galeri */}
+                  <div className="flex gap-2">
+                    <Input
+                      id="gallery-upload"
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={handleGalleryUpload}
+                      disabled={isUploading}
+                      className="hidden"
+                    />
+                    <Label
+                      htmlFor="gallery-upload"
+                      className={cn(
+                        "inline-flex h-9 items-center justify-center rounded-md border border-dashed border-primary/50 bg-primary/5 px-4 text-xs font-medium text-primary transition-colors hover:bg-primary/10 cursor-pointer gap-2 w-full",
+                        isUploading && "opacity-50"
+                      )}
+                    >
+                      {uploadingGallery ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Plus className="w-4 h-4" />
+                      )}{" "}
+                      Tambah Gambar Galeri
+                    </Label>
+                  </div>
+
+                  {/* Grid Thumbnail Galeri */}
+                  {selectedProduct.galleryUrls &&
+                  selectedProduct.galleryUrls.length > 0 ? (
+                    <div className="grid grid-cols-4 gap-2">
+                      {selectedProduct.galleryUrls.map((url, idx) => (
+                        <div
+                          key={idx}
+                          className="relative group aspect-square bg-muted rounded-md overflow-hidden border"
+                        >
+                          <img
+                            src={url}
+                            alt={`Galeri ${idx}`}
+                            className="w-full h-full object-cover"
+                          />
+                          <button
+                            onClick={() => removeGalleryImage(idx)}
+                            type="button"
+                            className="absolute top-1 right-1 bg-black/50 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-xs text-muted-foreground text-center py-4 border border-dashed rounded-md">
+                      Belum ada gambar galeri
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Harga (IDR)</Label>
+                <Input
+                  type="number"
+                  value={selectedProduct.price || 0}
+                  onChange={(e) =>
+                    handleDialogChange("price", parseFloat(e.target.value))
+                  }
+                  disabled={isUploading}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Stok</Label>
+                <Input
+                  type="number"
+                  value={selectedProduct.stock || 0}
+                  onChange={(e) =>
+                    handleDialogChange("stock", parseInt(e.target.value))
+                  }
+                  disabled={isUploading}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <Select
+                  value={selectedProduct.status || "ACTIVE"}
+                  onValueChange={(v) => handleDialogChange("status", v)}
+                >
+                  <SelectTrigger disabled={isUploading}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ACTIVE">Active</SelectItem>
+                    <SelectItem value="INACTIVE">Inactive</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Catatan Pembeli</Label>
+                <Select
+                  value={selectedProduct.enableNotes ? "true" : "false"}
+                  onValueChange={(v) =>
+                    handleDialogChange("enableNotes", v === "true")
+                  }
+                >
+                  <SelectTrigger disabled={isUploading}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="true">Aktif</SelectItem>
+                    <SelectItem value="false">Nonaktif</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </FormGrid>
+          )}
         </AdminDialog>
       </div>
     </div>

@@ -1,43 +1,74 @@
 "use client";
 import { AdminSidebar } from "@/components/layout/AdminSidebar";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Menu } from "lucide-react";
 import { useSidebarPersistence } from "@/hooks/useSidebarPersistence";
 
-export default function AdminLayout({ children }: { children: React.ReactNode }){
-  useEffect(() => {
-    document.documentElement.classList.add("admin-dark");
-    document.body.classList.add("admin-body");
-    return () => {
-      document.documentElement.classList.remove("admin-dark");
-      document.body.classList.remove("admin-body");
-    };
-  }, []);
-
+export default function AdminLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   useSidebarPersistence("admin_sidebar_collapsed", collapsed, setCollapsed);
 
   return (
-    <div className="min-h-screen flex">
-      <AdminSidebar collapsed={collapsed} onToggle={()=> setCollapsed(v=>!v)} />
+    <div className="min-h-screen flex bg-background">
+      {/* Desktop Sidebar: Dibuat STICKY agar selalu terlihat penuh */}
+      <AdminSidebar
+        collapsed={collapsed}
+        onToggle={() => setCollapsed((v) => !v)}
+        className="hidden md:flex sticky top-0 h-screen z-30"
+      />
 
-      <div className={`fixed inset-0 z-50 md:hidden ${mobileOpen?"":"pointer-events-none"}`}>
-        <div className={`absolute inset-0 bg-black/40 transition ${mobileOpen?"opacity-100":"opacity-0"}`} onClick={()=>setMobileOpen(false)} />
-        <div className={`absolute left-0 top-0 h-full w-72 admin-sidebar border-r bg-card transition-transform ${mobileOpen?"translate-x-0":"-translate-x-full"}`}>
-          <AdminSidebar collapsed={false} onToggle={()=> setMobileOpen(false)} />
+      {/* Mobile Sidebar Overlay */}
+      <div
+        className={`fixed inset-0 z-50 md:hidden ${
+          mobileOpen ? "pointer-events-auto" : "pointer-events-none"
+        }`}
+      >
+        {/* Backdrop */}
+        <div
+          className={`absolute inset-0 bg-black/80 transition-opacity duration-300 ${
+            mobileOpen ? "opacity-100" : "opacity-0"
+          }`}
+          onClick={() => setMobileOpen(false)}
+        />
+        {/* Sidebar Container */}
+        <div
+          className={`absolute left-0 top-0 h-full transition-transform duration-300 ${
+            mobileOpen ? "translate-x-0" : "-translate-x-full"
+          }`}
+        >
+          <AdminSidebar
+            collapsed={false}
+            onToggle={() => setMobileOpen(false)}
+            className="h-full flex"
+          />
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col">
-        <div className="h-14 border-b flex items-center px-3 md:px-4 justify-between">
-          <button className="md:hidden inline-flex h-9 w-9 items-center justify-center rounded-md hover:bg-muted" onClick={()=> setMobileOpen(true)} aria-label="Open menu">
-            <Menu className="h-5 w-5"/>
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col min-w-0">
+        <header className="h-14 border-b flex items-center px-4 gap-4 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-40">
+          <button
+            className="md:hidden inline-flex h-9 w-9 items-center justify-center rounded-md hover:bg-accent hover:text-accent-foreground"
+            onClick={() => setMobileOpen(true)}
+            aria-label="Open menu"
+          >
+            <Menu className="h-5 w-5" />
           </button>
-          <div className="text-sm text-muted-foreground">Welcome back, developer</div>
-          <a href="/" className="text-sm underline-offset-4 hover:underline">View Store</a>
-        </div>
-        <main className={`flex-1 p-3 md:p-6 transition-[margin] duration-300 ${collapsed?"md:ml-16":"md:ml-64"}`}>{children}</main>
+          <div className="flex-1 font-semibold">Dashboard</div>
+          <a
+            href="/"
+            target="_blank"
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            View Store →
+          </a>
+        </header>
+        <main className="flex-1 p-4 md:p-6">{children}</main>
       </div>
     </div>
   );

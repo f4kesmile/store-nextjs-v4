@@ -1,37 +1,71 @@
-// src/components/ImageWithFallback.tsx
-import { useState } from "react";
+"use client";
 
-interface ImageWithFallbackProps {
-  src: string;
-  alt: string;
-  className?: string;
-  width?: number;
-  height?: number;
+import { useState, useEffect } from "react";
+import Image, { ImageProps } from "next/image";
+import { ImageIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+interface ImageWithFallbackProps extends Omit<ImageProps, "src"> {
+  src?: string | null;
+  fallbackClassName?: string;
 }
 
 export default function ImageWithFallback({
   src,
   alt,
-  className = "",
-  width = 80,
-  height = 80,
+  className,
+  fallbackClassName,
+  fill = false,
+  width,
+  height,
+  ...props
 }: ImageWithFallbackProps) {
-  const [hasError, setHasError] = useState(false);
+  const [error, setError] = useState(false);
 
-  const fallbackSvg = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='${width}' height='${height}' viewBox='0 0 ${width} ${height}'%3E%3Crect width='${width}' height='${height}' fill='%23f3f4f6'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23374151' font-size='${Math.floor(
-    width / 6
-  )}'%3ENo Image%3C/text%3E%3C/svg%3E`;
+  useEffect(() => {
+    setError(false);
+  }, [src]);
 
-  if (!src || hasError) {
-    return <img src={fallbackSvg} alt={alt} className={className} />;
+  if (!src || error) {
+    return (
+      <div
+        className={cn(
+          "flex items-center justify-center bg-muted text-muted-foreground",
+          className,
+          fallbackClassName
+        )}
+        style={fill ? { width: "100%", height: "100%" } : { width, height }}
+      >
+        <ImageIcon className="h-1/4 w-1/4 opacity-50" />
+      </div>
+    );
   }
 
+  // Jika menggunakan 'fill', kita tidak perlu width/height
+  if (fill) {
+    return (
+      <Image
+        src={src}
+        alt={alt}
+        className={cn("object-cover", className)}
+        onError={() => setError(true)}
+        fill
+        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+        {...props}
+      />
+    );
+  }
+
+  // Jika tidak menggunakan 'fill', kita wajib memberikan width & height
   return (
-    <img
+    <Image
       src={src}
       alt={alt}
-      className={className}
-      onError={() => setHasError(true)}
+      className={cn("object-cover", className)}
+      width={width || 500} // Default width jika lupa diisi
+      height={height || 500} // Default height jika lupa diisi
+      onError={() => setError(true)}
+      {...props}
     />
   );
 }

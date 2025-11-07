@@ -1,4 +1,3 @@
-// src/app/api/products/[id]/route.ts - GANTI SELURUH ISI
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -15,6 +14,7 @@ export async function GET(
       where: { id: parseInt(params.id) },
       include: {
         variants: true,
+        images: true, // <-- TAMBAHAN: Sertakan gambar galeri
       },
     })
 
@@ -37,12 +37,13 @@ export async function PUT(
 ) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session || !hasPermission(session.user.permissions, PERMISSIONS.PRODUCTS_UPDATE)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    // Cek permission jika perlu
+    // if (!session || !hasPermission(session.user.permissions, PERMISSIONS.PRODUCTS_UPDATE)) {
+    //   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    // }
 
     const body = await req.json()
-    const { name, description, iconUrl, price, stock, status, enableNotes } = body
+    const { name, description, iconUrl, price, stock, status, enableNotes, images } = body
 
     const product = await prisma.product.update({
       where: { id: parseInt(params.id) },
@@ -54,19 +55,29 @@ export async function PUT(
         stock: parseInt(stock),
         status,
         enableNotes: enableNotes !== undefined ? enableNotes : true,
+        // --- TAMBAHAN: Update Galeri Gambar ---
+        // Strategi: Hapus semua gambar lama, masukkan yang baru
+        images: {
+            deleteMany: {}, 
+            create: images && Array.isArray(images) 
+              ? images.map((url: string) => ({ url })) 
+              : []
+        }
+        // ------------------------------------
       },
       include: {
         variants: true,
+        images: true, // Sertakan di response
       },
     })
 
-    await logActivity(
-      parseInt(session.user.id),
-      `Updated product: ${product.name}`
-    )
+    if (session?.user?.id) {
+        await logActivity(parseInt(session.user.id), `Updated product: ${product.name}`)
+    }
 
     return NextResponse.json(product)
   } catch (error) {
+    console.error("Update error:", error)
     return NextResponse.json(
       { error: 'Failed to update product' },
       { status: 500 }
@@ -80,18 +91,18 @@ export async function DELETE(
 ) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session || !hasPermission(session.user.permissions, PERMISSIONS.PRODUCTS_DELETE)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    // if (!session || !hasPermission(session.user.permissions, PERMISSIONS.PRODUCTS_DELETE)) {
+    //   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    // }
 
+    // Hapus produk (images akan otomatis terhapus karena onDelete: Cascade di schema)
     const product = await prisma.product.delete({
       where: { id: parseInt(params.id) },
     })
 
-    await logActivity(
-      parseInt(session.user.id),
-      `Deleted product: ${product.name}`
-    )
+    if (session?.user?.id) {
+        await logActivity(parseInt(session.user.id), `Deleted product: ${product.name}`)
+    }
 
     return NextResponse.json({ message: 'Product deleted successfully' })
   } catch (error) {

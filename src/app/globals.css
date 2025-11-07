@@ -1,45 +1,80 @@
-/* Tailwind dark mode and design tokens for admin - enforce dark for all components */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    --background: 18 14% 6%;
-    --foreground: 210 40% 98%;
-    --card: 20 14% 10%;
-    --card-foreground: 210 40% 98%;
-    --popover: 20 14% 10%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 220 70% 55%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 12 6% 20%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 20 14% 18%;
-    --muted-foreground: 217 12% 62%;
-    --accent: 220 14% 14%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 220 15% 20%;
-    --input: 220 15% 20%;
-    --ring: 220 70% 55%;
-
+    /* PERBAIKAN: Mengubah HSL-parts (220 70% 55%) menjadi HSL() functions */
+    --background: hsl(0 0% 100%);
+    --foreground: hsl(222.2 84% 4.9%);
+    --card: hsl(0 0% 100%);
+    --card-foreground: hsl(222.2 84% 4.9%);
+    --popover: hsl(0 0% 100%);
+    --popover-foreground: hsl(222.2 84% 4.9%);
+    --primary: hsl(220 70% 55%);
+    --primary-foreground: hsl(210 40% 98%);
+    --secondary: hsl(210 40% 96.1%);
+    --secondary-foreground: hsl(222.2 47.4% 11.2%);
+    --muted: hsl(210 40% 96.1%);
+    --muted-foreground: hsl(215.4 16.3% 46.9%);
+    --accent: hsl(210 40% 96.1%);
+    --accent-foreground: hsl(222.2 47.4% 11.2%);
+    --destructive: hsl(0 84.2% 60.2%);
+    --destructive-foreground: hsl(210 40% 98%);
+    --border: hsl(214.3 31.8% 91.4%);
+    --input: hsl(214.3 31.8% 91.4%);
+    --ring: hsl(220 70% 55%);
     --radius: 0.6rem;
   }
 
-  /* Use .dark on html since darkMode is configured as ["class"] */
-  html.dark body { 
+  .dark {
+    /* PERBAIKAN: Mengubah HSL-parts menjadi HSL() functions */
+    --background: hsl(18 14% 6%);
+    --foreground: hsl(210 40% 98%);
+    --card: hsl(20 14% 10%);
+    --card-foreground: hsl(210 40% 98%);
+    --popover: hsl(20 14% 10%);
+    --popover-foreground: hsl(210 40% 98%);
+    --primary: hsl(220 70% 55%);
+    --primary-foreground: hsl(210 40% 98%);
+    --secondary: hsl(12 6% 20%);
+    --secondary-foreground: hsl(210 40% 98%);
+    --muted: hsl(20 14% 18%);
+    --muted-foreground: hsl(217 12% 62%);
+    --accent: hsl(220 14% 14%);
+    --accent-foreground: hsl(210 40% 98%);
+    --destructive: hsl(0 84% 60%);
+    --destructive-foreground: hsl(210 40% 98%);
+    --border: hsl(220 15% 20%);
+    --input: hsl(220 15% 20%);
+    --ring: hsl(220 70% 55%);
+  }
+
+  /* Ini sudah benar */
+  html.dark body {
     @apply bg-[hsl(var(--background))] text-[hsl(var(--foreground))];
   }
 }
 
 @layer components {
-  /* Force all shadcn primitives into dark surfaces */
-  .admin-surface { @apply bg-[hsl(var(--card))] border border-[hsl(var(--border))] text-[hsl(var(--foreground))]; }
-  .admin-input { @apply bg-[hsl(var(--accent))] border-[hsl(var(--border))] placeholder:text-white/50; }
-  .admin-table { @apply bg-[hsl(var(--card))] text-[hsl(var(--foreground))]; }
-  .admin-table thead tr { @apply bg-[hsl(var(--accent))]; }
-  .admin-table tr { @apply border-b border-[hsl(var(--border))]; }
-  .admin-table td, .admin-table th { @apply text-[hsl(var(--foreground))]; }
+  /* Ini sudah benar */
+  .admin-surface {
+    @apply bg-[hsl(var(--card))] border border-[hsl(var(--border))] text-[hsl(var(--foreground))];
+  }
+  .admin-input {
+    @apply bg-[hsl(var(--accent))] border-[hsl(var(--border))] placeholder:text-white/50;
+  }
+  .admin-table {
+    @apply bg-[hsl(var(--card))] text-[hsl(var(--foreground))];
+  }
+  .admin-table thead tr {
+    @apply bg-[hsl(var(--accent))];
+  }
+  .admin-table tr {
+    @apply border-b border-[hsl(var(--border))];
+  }
+  .admin-table td,
+  .admin-table th {
+    @apply text-[hsl(var(--foreground))];
+  }
 }

@@ -1,9 +1,24 @@
-// src/app/admin/roles/page.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import { PERMISSIONS } from "@/lib/permissions";
+import AdminCard from "@/components/admin/shared/AdminCard";
+import AdminDialog from "@/components/admin/shared/AdminDialog";
+import AdminTable from "@/components/admin/shared/AdminTable";
+import {
+  ActionDropdown,
+  createCommonActions,
+} from "@/components/admin/shared/AdminComponents";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
+import { Shield, Plus, Users, Lock } from "lucide-react";
+import { toast } from "sonner";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface Role {
   id: number;
@@ -16,7 +31,8 @@ interface Role {
 }
 
 export default function RolesManagement() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
+  const router = useRouter();
   const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -25,31 +41,84 @@ export default function RolesManagement() {
     name: "",
     permissions: [] as string[],
   });
+  const [searchValue, setSearchValue] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
+    if (status === "loading") return;
     if (session?.user.role !== "DEVELOPER") {
-      window.location.href = "/admin";
+      router.replace("/admin");
       return;
     }
     fetchRoles();
-  }, [session]);
+  }, [session, status, router]);
 
   const fetchRoles = async () => {
+    setLoading(true);
     try {
       const res = await fetch("/api/roles");
-      const data = await res.json();
-      setRoles(data);
+      if (res.ok) {
+        const data = await res.json();
+        setRoles(data);
+      } else {
+        toast.error("Gagal memuat roles");
+      }
     } catch (error) {
-      console.error("Error:", error);
+      toast.error("Terjadi kesalahan koneksi");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
+  const handleCreateRole = () => {
+    setEditingRole(null);
+    setFormData({ name: "", permissions: [] });
+    setShowModal(true);
+  };
 
+  const handleEditRole = (role: Role) => {
+    if (role.name === "DEVELOPER") {
+      toast.warning("Role DEVELOPER tidak dapat diedit!");
+      return;
+    }
+    setEditingRole(role);
+    setFormData({
+      name: role.name,
+      permissions: role.permissions,
+    });
+    setShowModal(true);
+  };
+
+  const handleDeleteRole = async (role: Role) => {
+    if (role.name === "DEVELOPER") {
+      toast.warning("Tidak dapat menghapus role DEVELOPER!");
+      return;
+    }
+
+    if (!confirm(`Apakah Anda yakin ingin menghapus role ${role.name}?`))
+      return;
+
+    try {
+      const res = await fetch(`/api/roles/${role.id}`, { method: "DELETE" });
+      if (res.ok) {
+        toast.success(`Role ${role.name} berhasil dihapus`);
+        fetchRoles();
+      } else {
+        const err = await res.json();
+        toast.error(err.error || "Gagal menghapus role");
+      }
+    } catch (error) {
+      toast.error("Terjadi kesalahan saat menghapus");
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (!formData.name.trim()) {
+      toast.error("Nama role harus diisi");
+      return;
+    }
+
+    setIsSaving(true);
     try {
       const url = editingRole ? `/api/roles/${editingRole.id}` : "/api/roles";
       const method = editingRole ? "PUT" : "POST";
@@ -61,59 +130,18 @@ export default function RolesManagement() {
       });
 
       if (res.ok) {
-        await fetchRoles();
+        toast.success(editingRole ? "Role diperbarui" : "Role dibuat");
         setShowModal(false);
-        resetForm();
+        fetchRoles();
       } else {
         const error = await res.json();
-        alert(error.error || "Failed to save role");
+        toast.error(error.error || "Gagal menyimpan role");
       }
     } catch (error) {
-      console.error("Error:", error);
-      alert("Failed to save role");
+      toast.error("Terjadi kesalahan koneksi");
     } finally {
-      setLoading(false);
+      setIsSaving(false);
     }
-  };
-
-  const handleDelete = async (id: number, roleName: string) => {
-    if (roleName === "DEVELOPER") {
-      alert("Tidak dapat menghapus role DEVELOPER!");
-      return;
-    }
-
-    if (!confirm(`Apakah Anda yakin ingin menghapus role ${roleName}?`)) return;
-
-    try {
-      const res = await fetch(`/api/roles/${id}`, { method: "DELETE" });
-      if (res.ok) {
-        await fetchRoles();
-      }
-    } catch (error) {
-      console.error("Error:", error);
-    }
-  };
-
-  const handleEdit = (role: Role) => {
-    if (role.name === "DEVELOPER") {
-      alert("Role DEVELOPER tidak dapat diedit!");
-      return;
-    }
-
-    setEditingRole(role);
-    setFormData({
-      name: role.name,
-      permissions: role.permissions,
-    });
-    setShowModal(true);
-  };
-
-  const resetForm = () => {
-    setEditingRole(null);
-    setFormData({
-      name: "",
-      permissions: [],
-    });
   };
 
   const togglePermission = (permission: string) => {
@@ -139,242 +167,251 @@ export default function RolesManagement() {
     }));
   };
 
-  if (session?.user.role !== "DEVELOPER") {
-    return null;
-  }
-
   // Group permissions by category
-  const permissionGroups = {
-    Products: Object.entries(PERMISSIONS)
-      .filter(([key]) => key.startsWith("PRODUCTS_"))
-      .map(([, value]) => value),
-    Resellers: Object.entries(PERMISSIONS)
-      .filter(([key]) => key.startsWith("RESELLERS_"))
-      .map(([, value]) => value),
-    Users: Object.entries(PERMISSIONS)
-      .filter(([key]) => key.startsWith("USERS_"))
-      .map(([, value]) => value),
-    Others: Object.entries(PERMISSIONS)
-      .filter(
-        ([key]) =>
-          !key.startsWith("PRODUCTS_") &&
-          !key.startsWith("RESELLERS_") &&
-          !key.startsWith("USERS_")
-      )
-      .map(([, value]) => value),
+  const permissionGroups = useMemo(
+    () => ({
+      Products: Object.values(PERMISSIONS).filter((p) =>
+        p.startsWith("products:")
+      ),
+      Resellers: Object.values(PERMISSIONS).filter((p) =>
+        p.startsWith("resellers:")
+      ),
+      Users: Object.values(PERMISSIONS).filter((p) => p.startsWith("users:")),
+      Others: Object.values(PERMISSIONS).filter(
+        (p) =>
+          !p.startsWith("products:") &&
+          !p.startsWith("resellers:") &&
+          !p.startsWith("users:")
+      ),
+    }),
+    []
+  );
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString("id-ID", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
   };
 
+  const columns = [
+    {
+      key: "name",
+      label: "Role Name",
+      render: (name: string, role: Role) => (
+        <div className="flex items-center gap-2">
+          <span className="font-medium">{name}</span>
+          {name === "DEVELOPER" && (
+            <Badge variant="destructive" className="text-[10px] px-1.5 py-0.5">
+              <Lock className="w-3 h-3 mr-1" /> Protected
+            </Badge>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: "_count",
+      label: "Users",
+      render: (_: any, role: Role) => (
+        <div className="flex items-center gap-1 text-muted-foreground">
+          <Users className="w-4 h-4" />
+          <span>{role._count?.users || 0}</span>
+        </div>
+      ),
+    },
+    {
+      key: "permissions",
+      label: "Permissions",
+      render: (perms: string[]) => (
+        <Badge variant="outline">{perms.length} Access</Badge>
+      ),
+    },
+    {
+      key: "createdAt",
+      label: "Created At",
+      className: "hidden md:table-cell text-muted-foreground text-sm",
+      render: (date: string) => formatDate(date),
+    },
+    {
+      key: "actions",
+      label: "",
+      className: "w-10",
+      render: (_: any, role: Role) => (
+        <ActionDropdown
+          disabled={role.name === "DEVELOPER"}
+          actions={createCommonActions.crud(
+            undefined,
+            () => handleEditRole(role),
+            () => handleDeleteRole(role)
+          )}
+        />
+      ),
+    },
+  ];
+
+  const filteredRoles = useMemo(() => {
+    return roles.filter((role) =>
+      role.name.toLowerCase().includes(searchValue.toLowerCase())
+    );
+  }, [roles, searchValue]);
+
+  if (status === "loading" || session?.user.role !== "DEVELOPER") return null;
+
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-800">
-            Manajemen Roles & Permissions
-          </h1>
-          <p className="text-gray-600 mt-1">
-            Kelola roles dan hak akses pengguna
-          </p>
+    <div className="min-h-screen p-4 sm:p-6">
+      <div className="max-w-7xl mx-auto space-y-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">
+              <Shield className="w-8 h-8 text-primary" />
+              Roles & Permissions
+            </h1>
+            <p className="text-muted-foreground mt-1">
+              Kelola hak akses pengguna sistem
+            </p>
+          </div>
+          <Button onClick={handleCreateRole} className="gap-2">
+            <Plus className="w-4 h-4" /> Role Baru
+          </Button>
         </div>
-        <button
-          onClick={() => {
-            resetForm();
-            setShowModal(true);
-          }}
-          className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold"
+
+        <AdminCard
+          title="Daftar Role"
+          description={`${filteredRoles.length} role tersedia`}
         >
-          ➕ Tambah Role
-        </button>
-      </div>
+          <AdminTable
+            columns={columns}
+            data={filteredRoles}
+            loading={loading}
+            searchable
+            searchValue={searchValue}
+            onSearchChange={setSearchValue}
+            searchPlaceholder="Cari role..."
+          />
+        </AdminCard>
 
-      {/* Roles Grid */}
-      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {roles.map((role) => (
-          <div
-            key={role.id}
-            className={`bg-white rounded-xl shadow-lg p-6 hover:shadow-2xl transition-all ${
-              role.name === "DEVELOPER"
-                ? "border-2 border-red-500"
-                : "hover:scale-105"
-            }`}
-          >
-            <div className="flex items-start justify-between mb-4">
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <h3 className="text-xl font-bold text-gray-800">
-                    {role.name}
-                  </h3>
-                  {role.name === "DEVELOPER" && (
-                    <span className="px-2 py-1 bg-red-100 text-red-700 text-xs font-bold rounded">
-                      PROTECTED
-                    </span>
-                  )}
-                </div>
-                <p className="text-sm text-gray-600">
-                  {role._count?.users || 0} pengguna
-                </p>
-              </div>
-              <div className="text-3xl">
-                {role.name === "DEVELOPER" ? "👑" : "🔐"}
-              </div>
+        {/* Modal Create/Edit Role */}
+        <AdminDialog
+          open={showModal}
+          onOpenChange={setShowModal}
+          title={
+            editingRole ? `Edit Role: ${editingRole.name}` : "Buat Role Baru"
+          }
+          size="lg"
+          footer={
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setShowModal(false)}
+                disabled={isSaving}
+              >
+                Batal
+              </Button>
+              <Button onClick={handleSubmit} disabled={isSaving}>
+                {isSaving ? "Menyimpan..." : "Simpan Role"}
+              </Button>
             </div>
-
-            <div className="mb-4">
-              <p className="text-xs font-bold text-gray-700 mb-2">
-                Permissions ({role.permissions.length})
+          }
+        >
+          <div className="space-y-6 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="roleName">Nama Role</Label>
+              <Input
+                id="roleName"
+                placeholder="Contoh: STAFF_GUDANG"
+                value={formData.name}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    name: e.target.value.toUpperCase(),
+                  }))
+                }
+                disabled={!!editingRole} // Nama role sebaiknya tidak diubah jika sudah dibuat untuk konsistensi, atau buka jika perlu.
+              />
+              <p className="text-xs text-muted-foreground">
+                Nama role akan otomatis dikonversi ke HURUF BESAR.
               </p>
-              <div className="bg-gray-50 rounded-lg p-3 max-h-32 overflow-y-auto">
-                {role.permissions.length > 0 ? (
-                  <div className="flex flex-wrap gap-1">
-                    {role.permissions.slice(0, 5).map((perm, idx) => (
-                      <span
-                        key={idx}
-                        className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded"
-                      >
-                        {perm.split(":")[1]}
-                      </span>
-                    ))}
-                    {role.permissions.length > 5 && (
-                      <span className="px-2 py-1 bg-gray-200 text-gray-700 text-xs rounded">
-                        +{role.permissions.length - 5} more
-                      </span>
-                    )}
-                  </div>
-                ) : (
-                  <p className="text-xs text-gray-500">Tidak ada permission</p>
-                )}
-              </div>
             </div>
 
-            <div className="flex gap-2">
-              <button
-                onClick={() => handleEdit(role)}
-                disabled={role.name === "DEVELOPER"}
-                className="flex-1 px-3 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 font-medium disabled:bg-gray-300 disabled:cursor-not-allowed"
-              >
-                ✏️ Edit
-              </button>
-              <button
-                onClick={() => handleDelete(role.id, role.name)}
-                disabled={role.name === "DEVELOPER"}
-                className="flex-1 px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 font-medium disabled:bg-gray-300 disabled:cursor-not-allowed"
-              >
-                🗑️ Hapus
-              </button>
-            </div>
-
-            <div className="mt-3 pt-3 border-t text-xs text-gray-500">
-              Dibuat: {new Date(role.createdAt).toLocaleDateString("id-ID")}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Modal Form */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-white rounded-xl max-w-3xl w-full p-6 my-8">
-            <h2 className="text-2xl font-bold mb-6">
-              {editingRole ? "Edit Role" : "Tambah Role Baru"}
-            </h2>
-
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Nama Role
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={formData.name}
-                  onChange={(e) =>
-                    setFormData({ ...formData, name: e.target.value })
-                  }
-                  className="w-full border rounded-lg p-3"
-                  placeholder="ADMIN, STAFF, dll"
-                />
-              </div>
-
-              <div>
-                <div className="flex justify-between items-center mb-3">
-                  <label className="block text-sm font-medium">
-                    Permissions
-                  </label>
-                  <div className="space-x-2">
-                    <button
-                      type="button"
-                      onClick={selectAllPermissions}
-                      className="text-xs px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
-                    >
-                      Select All
-                    </button>
-                    <button
-                      type="button"
-                      onClick={deselectAllPermissions}
-                      className="text-xs px-3 py-1 bg-gray-500 text-white rounded hover:bg-gray-600"
-                    >
-                      Deselect All
-                    </button>
-                  </div>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label>Permissions Access</Label>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="xs"
+                    onClick={selectAllPermissions}
+                    className="h-7 text-xs"
+                  >
+                    Select All
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="xs"
+                    onClick={deselectAllPermissions}
+                    className="h-7 text-xs"
+                  >
+                    Deselect All
+                  </Button>
                 </div>
+              </div>
 
-                <div className="border rounded-lg p-4 space-y-4 max-h-96 overflow-y-auto">
-                  {Object.entries(permissionGroups).map(
-                    ([group, permissions]) => (
-                      <div key={group} className="space-y-2">
-                        <h4 className="font-bold text-sm text-gray-700 border-b pb-2">
-                          {group}
-                        </h4>
-                        <div className="grid grid-cols-2 gap-2">
-                          {permissions.map((permission) => (
-                            <label
-                              key={permission}
-                              className="flex items-center gap-2 p-2 hover:bg-gray-50 rounded cursor-pointer"
-                            >
-                              <input
-                                type="checkbox"
-                                checked={formData.permissions.includes(
-                                  permission
-                                )}
-                                onChange={() => togglePermission(permission)}
-                                className="w-4 h-4"
-                              />
-                              <span className="text-sm">{permission}</span>
-                            </label>
-                          ))}
-                        </div>
+              <ScrollArea className="h-[400px] border rounded-md p-4">
+                <div className="space-y-6">
+                  {Object.entries(permissionGroups).map(([group, perms]) => (
+                    <div key={group}>
+                      <h4 className="font-semibold text-sm text-foreground mb-3 flex items-center gap-2">
+                        {group}{" "}
+                        <Badge
+                          variant="secondary"
+                          className="text-[10px] px-1.5"
+                        >
+                          {perms.length}
+                        </Badge>
+                      </h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {perms.map((permission) => (
+                          <div
+                            key={permission}
+                            className="flex items-start space-x-2 border p-2 rounded-md bg-muted/30 hover:bg-muted/50 transition-colors"
+                          >
+                            <Checkbox
+                              id={permission}
+                              checked={formData.permissions.includes(
+                                permission
+                              )}
+                              onCheckedChange={() =>
+                                togglePermission(permission)
+                              }
+                            />
+                            <div className="grid gap-1.5 leading-none">
+                              <label
+                                htmlFor={permission}
+                                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                              >
+                                {permission}
+                              </label>
+                              <p className="text-[11px] text-muted-foreground capitalize">
+                                {permission.replace(":", " ")} access
+                              </p>
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    )
-                  )}
+                    </div>
+                  ))}
                 </div>
-
-                <p className="text-xs text-gray-600 mt-2">
-                  {formData.permissions.length} permissions dipilih
-                </p>
+              </ScrollArea>
+              <div className="text-right text-xs text-muted-foreground">
+                Total terpilih: {formData.permissions.length}
               </div>
-
-              <div className="flex gap-3 pt-4">
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="flex-1 bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 disabled:bg-gray-400"
-                >
-                  {loading ? "Saving..." : editingRole ? "Update" : "Simpan"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowModal(false);
-                    resetForm();
-                  }}
-                  className="px-6 bg-gray-300 rounded-lg hover:bg-gray-400"
-                >
-                  Batal
-                </button>
-              </div>
-            </form>
+            </div>
           </div>
-        </div>
-      )}
+        </AdminDialog>
+      </div>
     </div>
   );
 }

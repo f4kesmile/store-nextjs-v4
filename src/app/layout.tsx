@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import "@/styles/admin-dark.css";
-import { Providers } from "./providers";
+
+import { Providers } from "./providers"; // <-- Hanya impor ini
 import { CartProvider } from "@/contexts/CartContext";
 import { ResellerProvider } from "@/contexts/ResellerContext";
-import { ThemeProvider } from "@/components/theme-provider";
+// HAPUS: 'ThemeProvider as NextThemesProvider' from "next-themes";
 import { getServerSettings } from "@/lib/server-settings";
 import HeadFavicon from "@/components/HeadFavicon";
 import { Toaster } from "sonner";
@@ -30,19 +30,18 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="id">
+    <html lang="id" suppressHydrationWarning>
       <body>
-        <ThemeProvider>
-          <Providers>
-            <HeadFavicon />
-            <ResellerProvider>
-              <CartProvider>
-                {children}
-                <Toaster richColors position="top-right" visibleToasts={3} />
-              </CartProvider>
-            </ResellerProvider>
-          </Providers>
-        </ThemeProvider>
+        {/* HAPUS NextThemesProvider dari sini */}
+        <Providers>
+          <HeadFavicon />
+          <ResellerProvider>
+            <CartProvider>
+              {children}
+              <Toaster richColors position="top-right" visibleToasts={3} />
+            </CartProvider>
+          </ResellerProvider>
+        </Providers>
       </body>
     </html>
   );

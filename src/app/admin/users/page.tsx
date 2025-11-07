@@ -21,7 +21,7 @@ import {
   SelectValue,
 } from "../../../components/ui/select";
 import { Users, UserPlus, Calendar } from "lucide-react";
-import { toast } from "../../../components/ui/use-toast";
+import { toast } from "sonner"; // Ganti import
 
 // Interface berdasarkan data API Anda (dari /api/users/route.ts)
 interface Role {
@@ -58,10 +58,10 @@ const UsersPage: React.FC = () => {
         const data = await res.json();
         setUsers(data);
       } else {
-        toast({ title: "Gagal memuat users", variant: "destructive" });
+        toast.error("Gagal memuat users");
       }
     } catch (error) {
-      toast({ title: "Terjadi kesalahan", variant: "destructive" });
+      toast.error("Terjadi kesalahan");
     } finally {
       setLoading(false);
     }
@@ -103,16 +103,15 @@ const UsersPage: React.FC = () => {
       try {
         const res = await fetch(`/api/users/${user.id}`, { method: "DELETE" });
         if (res.ok) {
-          toast({
-            title: "User dihapus",
+          toast.success("User dihapus", {
             description: `${user.username} telah dihapus.`,
           });
           fetchUsers(); // Muat ulang data
         } else {
-          toast({ title: "Gagal menghapus", variant: "destructive" });
+          toast.error("Gagal menghapus");
         }
       } catch (error) {
-        toast({ title: "Terjadi kesalahan", variant: "destructive" });
+        toast.error("Terjadi kesalahan");
       }
     }
   };
@@ -137,8 +136,7 @@ const UsersPage: React.FC = () => {
       });
 
       if (res.ok) {
-        toast({
-          title: "Berhasil disimpan",
+        toast.success("Berhasil disimpan", {
           description: `Data user ${selectedUser.username} tersimpan.`,
         });
         setIsDialogOpen(false);
@@ -146,14 +144,12 @@ const UsersPage: React.FC = () => {
         fetchUsers(); // Muat ulang data
       } else {
         const err = await res.json();
-        toast({
-          title: "Gagal menyimpan",
+        toast.error("Gagal menyimpan", {
           description: err.error,
-          variant: "destructive",
         });
       }
     } catch (error) {
-      toast({ title: "Terjadi kesalahan", variant: "destructive" });
+      toast.error("Terjadi kesalahan");
     }
   };
 
