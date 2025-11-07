@@ -1,5 +1,6 @@
+// src/app/api/upload/logo/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { writeFile, mkdir } from "fs/promises";
+import { put } from '@vercel/blob';
 import path from "path";
 
 export async function POST(req: NextRequest) {
@@ -11,33 +12,27 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
 
-    // Validate file type
+    // Validasi (tetap sama)
     if (!file.type.startsWith("image/")) {
       return NextResponse.json({ error: "File must be an image" }, { status: 400 });
     }
-
-    // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       return NextResponse.json({ error: "File too large. Maximum 5MB allowed" }, { status: 400 });
     }
 
-    const bytes = Buffer.from(await file.arrayBuffer());
-    const uploadDir = path.join(process.cwd(), "public", "uploads");
-    
-    // Ensure upload directory exists
-    await mkdir(uploadDir, { recursive: true });
-    
     // Generate unique filename
     const timestamp = Date.now();
     const extension = file.name.split('.').pop() || 'png';
-    const filename = `logo-${timestamp}.${extension}`;
-    const filepath = path.join(uploadDir, filename);
+    // Simpan di folder 'settings' di dalam blob store
+    const filename = `settings/logo-${timestamp}.${extension}`;
     
-    // Write file
-    await writeFile(filepath, bytes);
+    // Upload ke Vercel Blob
+    const blob = await put(filename, file, {
+      access: 'public',
+    });
     
     return NextResponse.json({ 
-      logoPath: `/uploads/${filename}`,
+      logoPath: blob.url, // Return URL dari Blob
       success: true,
       message: "Logo uploaded successfully"
     });

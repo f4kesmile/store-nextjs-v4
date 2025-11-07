@@ -1,7 +1,9 @@
-// src/app/api/upload/route.ts - GANTI DENGAN KODE INI
+// src/app/api/upload/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile, mkdir } from 'fs/promises';
+import { put } from '@vercel/blob';
 import path from 'path';
+
+// Hapus import fs/promises
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,7 +16,6 @@ export async function POST(request: NextRequest) {
 
     if (!file) {
       console.log('❌ No file in FormData');
-      console.log('📝 FormData keys:', Array.from(data.keys()));
       return NextResponse.json({ error: 'No file received' }, { status: 400 });
     }
 
@@ -24,7 +25,7 @@ export async function POST(request: NextRequest) {
       type: file.type
     });
 
-    // Validasi tipe file
+    // Validasi (tetap sama)
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
     if (!allowedTypes.includes(file.type)) {
       console.log('❌ Invalid file type:', file.type);
@@ -32,8 +33,6 @@ export async function POST(request: NextRequest) {
         error: `Tipe file tidak didukung: ${file.type}. Hanya JPEG, PNG, WebP, dan GIF yang diizinkan` 
       }, { status: 400 });
     }
-
-    // Validasi ukuran file (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       console.log('❌ File too large:', file.size);
       return NextResponse.json({ 
@@ -41,45 +40,29 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Check if file has content
-    if (file.size === 0) {
-      console.log('❌ Empty file');
-      return NextResponse.json({ 
-        error: 'File kosong atau tidak valid' 
-      }, { status: 400 });
-    }
-
     console.log('✅ File validation passed');
-
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-    console.log('📦 File converted to buffer, size:', buffer.length);
 
     // Generate unique filename
     const timestamp = Date.now();
     const fileExtension = path.extname(file.name) || '.jpg';
     const baseName = path.basename(file.name, fileExtension).replace(/[^a-zA-Z0-9.-]/g, '_');
-    const filename = `${timestamp}_${baseName}${fileExtension}`;
+    // Simpan di folder 'products' di dalam blob store
+    const filename = `products/${timestamp}_${baseName}${fileExtension}`;
 
     console.log('📝 Generated filename:', filename);
 
-    // Pastikan folder uploads/products ada
-    const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'products');
-    await mkdir(uploadDir, { recursive: true });
-    console.log('📁 Upload directory ready:', uploadDir);
-
-    // Simpan file
-    const filepath = path.join(uploadDir, filename);
-    await writeFile(filepath, buffer);
-    console.log('💾 File saved to:', filepath);
-
-    // Return URL path relatif
-    const imageUrl = `/uploads/products/${filename}`;
+    // Upload ke Vercel Blob
+    const blob = await put(filename, file, {
+      access: 'public',
+    });
+    
+    // Return URL publik dari Vercel Blob
+    const imageUrl = blob.url;
 
     console.log('✅ Upload successful:', imageUrl);
     return NextResponse.json({ 
       message: 'File berhasil diupload', 
-      imageUrl,
+      imageUrl, // Kirim URL Vercel Blob
       filename,
       size: file.size,
       type: file.type

@@ -1,5 +1,6 @@
+// src/app/api/upload/favicon/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { writeFile, mkdir } from "fs/promises";
+import { put } from '@vercel/blob';
 import path from "path";
 
 export async function POST(req: NextRequest) {
@@ -11,34 +12,28 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
 
-    // Validate file type (allow .ico, .png)
+    // Validasi (tetap sama)
     const allowedTypes = ['image/x-icon', 'image/vnd.microsoft.icon', 'image/png'];
     if (!allowedTypes.includes(file.type) && !file.name.toLowerCase().endsWith('.ico')) {
       return NextResponse.json({ error: "File must be .ico or .png format" }, { status: 400 });
     }
-
-    // Validate file size (max 2MB for favicon)
     if (file.size > 2 * 1024 * 1024) {
       return NextResponse.json({ error: "File too large. Maximum 2MB allowed for favicon" }, { status: 400 });
     }
 
-    const bytes = Buffer.from(await file.arrayBuffer());
-    const uploadDir = path.join(process.cwd(), "public", "uploads");
-    
-    // Ensure upload directory exists
-    await mkdir(uploadDir, { recursive: true });
-    
     // Generate unique filename
     const timestamp = Date.now();
     const extension = file.name.toLowerCase().endsWith('.ico') ? 'ico' : 'png';
-    const filename = `favicon-${timestamp}.${extension}`;
-    const filepath = path.join(uploadDir, filename);
+    // Simpan di folder 'settings' di dalam blob store
+    const filename = `settings/favicon-${timestamp}.${extension}`;
     
-    // Write file
-    await writeFile(filepath, bytes);
+    // Upload ke Vercel Blob
+    const blob = await put(filename, file, {
+      access: 'public',
+    });
     
     return NextResponse.json({ 
-      faviconPath: `/uploads/${filename}`,
+      faviconPath: blob.url, // Return URL dari Blob
       success: true,
       message: "Favicon uploaded successfully"
     });
