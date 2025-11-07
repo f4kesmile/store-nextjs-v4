@@ -6,6 +6,8 @@ import { prisma } from '@/lib/prisma'
 import { logActivity } from '@/lib/logger'
 import { hasPermission, PERMISSIONS } from '@/lib/permissions'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(req: NextRequest) {
   // ... (Fungsi GET tetap sama)
   try {
