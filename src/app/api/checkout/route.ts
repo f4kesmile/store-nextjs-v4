@@ -1,17 +1,14 @@
-// src/app/api/checkout/route.ts - FULL CODE
+// src/app/api/checkout/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    // Pastikan Anda menerima semua data yang dibutuhkan, termasuk customerInfo
     const { productId, variantId, quantity, resellerId, customerInfo, notes } = body 
 
-    // Destrukturisasi data pelanggan dari customerInfo
     const { name: customerName, phone: customerPhone } = customerInfo || {};
 
-    // Fetch product
     const product = await prisma.product.findUnique({
       where: { id: productId },
       include: { variants: true },
@@ -25,14 +22,22 @@ export async function POST(req: NextRequest) {
     let availableStock = product.stock
     let variantInfo = 'Standard'
     let selectedVariant = null
+    
+    // --- LOGIKA HARGA & STOK DIPERBARUI ---
+    let unitPrice = parseFloat(product.price.toString()) // Harga default
 
     if (variantId) {
       selectedVariant = product.variants.find((v) => v.id === variantId)
       if (selectedVariant) {
         availableStock = selectedVariant.stock
         variantInfo = `${selectedVariant.name}: ${selectedVariant.value}`
+        // Gunakan harga varian JIKA ADA, jika tidak, pakai harga produk
+        if (selectedVariant.price != null) {
+          unitPrice = parseFloat(selectedVariant.price.toString())
+        }
       }
     }
+    // ------------------------------------
 
     // Validate stock
     if (availableStock < quantity) {
@@ -42,46 +47,45 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // GET SUPPORT WHATSAPP & RESELLER INFO FROM DB/SETTINGS
+    // ... (Logika Reseller tetap sama) ...
     const settings = await prisma.siteSettings.findFirst()
-
     let whatsappNumber = settings?.supportWhatsApp || '6285185031023'
     let resellerName = settings?.storeName || 'Official Store'
     let resellerRecord = null
-    let finalResellerDbId = null // ID database Reseller
+    let finalResellerDbId = null 
 
-    // Check if reseller ID (uniqueId) is provided and valid
     if (resellerId) {
       resellerRecord = await prisma.reseller.findUnique({
-        where: { uniqueId: resellerId }, // Cari berdasarkan uniqueId (ref)
+        where: { uniqueId: resellerId }, 
       })
 
       if (resellerRecord) {
         whatsappNumber = resellerRecord.whatsappNumber
         resellerName = resellerRecord.name
-        finalResellerDbId = resellerRecord.id // Ambil ID database
+        finalResellerDbId = resellerRecord.id 
       }
     }
 
-    // Calculate total
-    const totalPrice = parseFloat(product.price.toString()) * quantity
+    // --- KALKULASI TOTALPRICE DIPERBARUI ---
+    const totalPrice = unitPrice * quantity
+    // -------------------------------------
 
     // CREATE TRANSACTION RECORD
     const transaction = await prisma.transaction.create({
       data: {
         productId: product.id,
         variantId: selectedVariant?.id || null,
-        resellerId: finalResellerDbId, // <-- GUNAKAN ID DARI DATABASE
+        resellerId: finalResellerDbId, 
         customerName: customerName || null,
         customerPhone: customerPhone || null,
         quantity,
-        totalPrice,
+        totalPrice, // Harga total yang sudah benar
         status: 'PENDING',
         notes: notes || null,
       },
     })
     
-    // UPDATE STOCK (Logika pengurangan stok yang sudah ada, ini sudah benar)
+    // ... (Logika Update Stok tetap sama) ...
     if (variantId && selectedVariant) {
       await prisma.variant.update({
         where: { id: selectedVariant.id },
@@ -94,7 +98,7 @@ export async function POST(req: NextRequest) {
       })
     }
     
-    // ... (Logika pembuatan pesan WhatsApp tetap sama) ...
+    // ... (Logika Pesan WhatsApp tetap sama) ...
     const now = new Date()
     const orderDate = now.toLocaleDateString('id-ID', {
       weekday: 'long',
@@ -114,8 +118,8 @@ export async function POST(req: NextRequest) {
     message += `🆔 Order ID: #${transaction.id}\n`
     message += `📅 Tanggal: ${orderDate}\n`
     message += `⏰ Waktu: ${orderTime} WIB\n`
-    message += `👤 Nama Customer: ${customerName || '-'}\n` // Tambah Customer Info
-    message += `📞 Telepon Customer: ${customerPhone || '-'}\n` // Tambah Customer Info
+    message += `👤 Nama Customer: ${customerName || '-'}\n`
+    message += `📞 Telepon Customer: ${customerPhone || '-'}\n`
     message += `━━━━━━━━━━━━━━━━━━━━━\n\n`
     message += `Detail Pesanan:\n`
     message += `📦 Produk: ${product.name}\n`

@@ -29,22 +29,23 @@ import {
   Loader2,
   Upload,
   X,
-  Trash2, // <-- IMPORT BARU
-  Database, // <-- IMPORT BARU
+  Trash2,
+  Database,
+  DollarSign, // <-- IMPORT BARU
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import ImageWithFallback from "@/components/ImageWithFallback";
-// --- IMPORT BARU UNTUK TABS ---
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge"; // <-- IMPORT BARU
+import { Badge } from "@/components/ui/badge";
 
 // --- INTERFACE DIPERBARUI ---
 interface Variant {
-  id?: number; // Opsional, karena bisa jadi varian baru
+  id?: number;
   name: string;
   value: string;
   stock: number;
+  price?: number | null; // <-- TAMBAHKAN HARGA
 }
 interface ProductImage {
   id: number;
@@ -56,7 +57,7 @@ interface Product {
   description: string | null;
   iconUrl: string | null;
   images: ProductImage[];
-  variants: Variant[]; // Tambahan untuk varian
+  variants: Variant[];
   stock: number;
   price: number;
   status: "ACTIVE" | "INACTIVE";
@@ -88,7 +89,7 @@ const ProductsPage: React.FC = () => {
 
   const [uploadingIcon, setUploadingIcon] = useState(false);
   const [uploadingGallery, setUploadingGallery] = useState(false);
-  const [isSaving, setIsSaving] = useState(false); // <-- State saving baru
+  const [isSaving, setIsSaving] = useState(false);
 
   const fetchProducts = async () => {
     setLoading(true);
@@ -96,7 +97,15 @@ const ProductsPage: React.FC = () => {
       const res = await fetch("/api/products?admin=true");
       if (res.ok) {
         const data = await res.json();
-        setProducts(data);
+        // Konversi harga varian dari string (Prisma Decimal) ke number
+        const formattedData = data.map((p: Product) => ({
+          ...p,
+          variants: p.variants.map((v: any) => ({
+            ...v,
+            price: v.price ? parseFloat(v.price) : null,
+          })),
+        }));
+        setProducts(formattedData);
       } else {
         toast.error("Gagal memuat produk");
       }
@@ -117,7 +126,7 @@ const ProductsPage: React.FC = () => {
       description: "",
       iconUrl: "",
       galleryUrls: [],
-      variants: [], // <-- Tambahkan varian kosong
+      variants: [],
       price: 0,
       stock: 0,
       status: "ACTIVE",
@@ -130,7 +139,10 @@ const ProductsPage: React.FC = () => {
     setSelectedProduct({
       ...product,
       galleryUrls: product.images.map((img) => img.url),
-      variants: product.variants || [], // <-- Isi varian dari produk
+      variants: product.variants.map((v) => ({
+        ...v,
+        price: v.price ? Number(v.price) : null, // Pastikan adalah number
+      })),
     });
     setIsDialogOpen(true);
   };
@@ -153,7 +165,6 @@ const ProductsPage: React.FC = () => {
     }
   };
 
-  // --- LOGIKA PENYIMPANAN DIPERBARUI ---
   const handleSaveProduct = async () => {
     if (!selectedProduct) return;
     setIsSaving(true);
@@ -164,7 +175,13 @@ const ProductsPage: React.FC = () => {
       : `/api/products/${selectedProduct.id}`;
     const method = isCreateMode ? "POST" : "PUT";
 
-    // Payload untuk Info Utama
+    // Siapkan varian, pastikan harga adalah angka atau null
+    const formattedVariants = (selectedProduct.variants || []).map((v) => ({
+      ...v,
+      price: v.price ? parseFloat(String(v.price)) : null,
+      stock: parseInt(String(v.stock)) || 0,
+    }));
+
     const mainPayload = {
       name: selectedProduct.name,
       description: selectedProduct.description,
@@ -174,12 +191,10 @@ const ProductsPage: React.FC = () => {
       status: selectedProduct.status,
       enableNotes: selectedProduct.enableNotes,
       images: selectedProduct.galleryUrls || [],
-      // Jika mode CREATE, API Anda mendukung pengiriman varian secara langsung
-      ...(isCreateMode && { variants: selectedProduct.variants || [] }),
+      ...(isCreateMode && { variants: formattedVariants }),
     };
 
     try {
-      // --- STEP 1: Simpan Info Utama (atau Buat Produk Baru) ---
       const res = await fetch(url, {
         method: method,
         headers: { "Content-Type": "application/json" },
@@ -193,15 +208,13 @@ const ProductsPage: React.FC = () => {
 
       const savedProduct = await res.json();
 
-      // --- STEP 2: Jika Edit, Simpan Varian Terpisah ---
-      // Kita gunakan API varian yang sudah ada/variants/route.ts]
       if (!isCreateMode) {
         const variantRes = await fetch(
           `/api/products/${savedProduct.id}/variants`,
           {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ variants: selectedProduct.variants || [] }),
+            body: JSON.stringify({ variants: formattedVariants }),
           }
         );
 
@@ -219,26 +232,27 @@ const ProductsPage: React.FC = () => {
       setIsSaving(false);
     }
   };
-  // ------------------------------------
 
   const handleDialogChange = (field: keyof ProductFormData, value: any) => {
     setSelectedProduct((prev) => (prev ? { ...prev, [field]: value } : null));
   };
 
-  // --- FUNGSI BARU UNTUK MENGELOLA VARIAN ---
   const handleVariantChange = (
     index: number,
     field: keyof Variant,
-    value: string | number
+    value: string | number | null
   ) => {
     setSelectedProduct((prev) => {
       if (!prev || !prev.variants) return prev;
       const newVariants = [...prev.variants];
       const targetVariant = { ...newVariants[index] };
 
-      // Konversi ke angka jika field-nya adalah 'stock'
       if (field === "stock") {
         targetVariant[field] = parseInt(String(value)) || 0;
+      } else if (field === "price") {
+        // Izinkan null atau angka
+        targetVariant[field] =
+          value === null || value === "" ? null : parseFloat(String(value));
       } else {
         (targetVariant as any)[field] = value;
       }
@@ -253,7 +267,7 @@ const ProductsPage: React.FC = () => {
       ...prev,
       variants: [
         ...(prev?.variants || []),
-        { name: "Ukuran", value: "Default", stock: 0 },
+        { name: "Ukuran", value: "Default", stock: 0, price: null }, // <-- Tambah harga
       ],
     }));
   };
@@ -264,9 +278,8 @@ const ProductsPage: React.FC = () => {
       variants: prev?.variants?.filter((_, i) => i !== index),
     }));
   };
-  // ----------------------------------------
 
-  // Upload untuk Icon Utama (Single)
+  // Handler Upload (Icon & Gallery) tetap sama...
   const handleIconUpload = async (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
@@ -292,16 +305,13 @@ const ProductsPage: React.FC = () => {
     }
   };
 
-  // Upload untuk Galeri (Multiple)
   const handleGalleryUpload = async (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
     const files = event.target.files;
     if (!files || files.length === 0) return;
-
     setUploadingGallery(true);
     const newUrls: string[] = [];
-
     try {
       for (let i = 0; i < files.length; i++) {
         const formData = new FormData();
@@ -315,7 +325,6 @@ const ProductsPage: React.FC = () => {
           newUrls.push(data.imageUrl);
         }
       }
-
       setSelectedProduct((prev) =>
         prev
           ? {
@@ -324,7 +333,6 @@ const ProductsPage: React.FC = () => {
             }
           : null
       );
-
       if (newUrls.length > 0)
         toast.success(`${newUrls.length} gambar ditambahkan ke galeri`);
     } catch (error) {
@@ -349,7 +357,7 @@ const ProductsPage: React.FC = () => {
   };
 
   const isUploading = uploadingIcon || uploadingGallery;
-  const isBusy = isUploading || isSaving; // Gabungkan state loading
+  const isBusy = isUploading || isSaving;
 
   const getStockStatus = (stock: number) =>
     stock === 0 ? "out_of_stock" : stock < 10 ? "low_stock" : "in_stock";
@@ -388,16 +396,30 @@ const ProductsPage: React.FC = () => {
     {
       key: "price",
       label: "Harga",
-      render: (v: number) => (
-        <span className="font-medium">{formatRupiah(v)}</span>
-      ),
+      render: (v: number, product: Product) => {
+        // --- TAMPILAN HARGA DIPERBARUI ---
+        if (product.variants && product.variants.length > 0) {
+          const prices = product.variants
+            .map((v) => v.price ?? product.price)
+            .filter(Boolean);
+          if (prices.length === 0) return formatRupiah(product.price);
+          const min = Math.min(...prices);
+          const max = Math.max(...prices);
+          if (min === max) return formatRupiah(min);
+          return (
+            <span className="font-medium">
+              {formatRupiah(min)} - {formatRupiah(max)}
+            </span>
+          );
+        }
+        return <span className="font-medium">{formatRupiah(v)}</span>;
+        // ---------------------------------
+      },
     },
-    // --- KOLOM STOK DIPERBARUI ---
     {
       key: "stock",
       label: "Stok",
       render: (v: number, product: Product) => {
-        // Jika ada varian, hitung total stok varian
         if (product.variants && product.variants.length > 0) {
           const totalVariantStock = product.variants.reduce(
             (acc, v) => acc + v.stock,
@@ -411,7 +433,6 @@ const ProductsPage: React.FC = () => {
             </div>
           );
         }
-        // Tampilan stok normal jika tidak ada varian
         return (
           <div className="flex items-center gap-2">
             <Package2 className="w-4 h-4 text-muted-foreground" />
@@ -421,7 +442,6 @@ const ProductsPage: React.FC = () => {
         );
       },
     },
-    // ----------------------------
     {
       key: "status",
       label: "Status",
@@ -464,6 +484,7 @@ const ProductsPage: React.FC = () => {
   return (
     <div className="min-h-screen p-4 sm:p-6">
       <div className="max-w-7xl mx-auto space-y-6">
+        {/* ... (Header halaman tetap sama) ... */}
         <div className="flex justify-between items-center">
           <h1 className="text-2xl font-bold">Produk</h1>
           <Button onClick={handleCreateProduct} className="gap-2">
@@ -521,6 +542,7 @@ const ProductsPage: React.FC = () => {
               {/* TAB 1: INFORMASI UTAMA */}
               <TabsContent value="info">
                 <FormGrid columns={2}>
+                  {/* ... (Nama, Deskripsi, Cover, Galeri tetap sama) ... */}
                   <div className="space-y-2 md:col-span-2">
                     <Label>Nama Produk</Label>
                     <Input
@@ -544,18 +566,13 @@ const ProductsPage: React.FC = () => {
                   </div>
                   <div className="space-y-2">
                     <Label>Cover Utama</Label>
-                    {/* ... (Kode upload cover tetap sama) ... */}
                     <div className="flex items-start gap-3">
                       <div className="w-20 h-20 bg-muted rounded-md flex items-center justify-center overflow-hidden shrink-0 border">
-                        {selectedProduct.iconUrl ? (
-                          <img
-                            src={selectedProduct.iconUrl}
-                            alt="Cover"
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <ImageIcon className="w-8 h-8 text-muted-foreground" />
-                        )}
+                        <ImageWithFallback
+                          src={selectedProduct.iconUrl}
+                          alt="Cover"
+                          className="w-full h-full object-cover"
+                        />
                       </div>
                       <div className="w-full space-y-2">
                         <Input
@@ -593,7 +610,6 @@ const ProductsPage: React.FC = () => {
                       </div>
                     </div>
                   </div>
-
                   <div className="space-y-2">
                     <Label>
                       Galeri ({selectedProduct.galleryUrls?.length || 0})
@@ -656,17 +672,24 @@ const ProductsPage: React.FC = () => {
                       )}
                     </div>
                   </div>
-
+                  {/* --- INPUT HARGA & STOK UTAMA DIMODIFIKASI --- */}
                   <div className="space-y-2">
-                    <Label>Harga (IDR)</Label>
+                    <Label>Harga Utama (IDR)</Label>
                     <Input
                       type="number"
                       value={selectedProduct.price || 0}
                       onChange={(e) =>
                         handleDialogChange("price", parseFloat(e.target.value))
                       }
-                      disabled={isBusy}
+                      disabled={
+                        isBusy || (selectedProduct.variants?.length || 0) > 0
+                      }
                     />
+                    {(selectedProduct.variants?.length || 0) > 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        Harga utama dipakai jika harga varian tidak diisi.
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label>Stok Utama</Label>
@@ -682,11 +705,11 @@ const ProductsPage: React.FC = () => {
                     />
                     {(selectedProduct.variants?.length || 0) > 0 && (
                       <p className="text-xs text-muted-foreground">
-                        Stok utama dinonaktifkan karena produk ini memiliki
-                        varian.
+                        Stok utama dinonaktifkan. Atur stok di tab Varian.
                       </p>
                     )}
                   </div>
+                  {/* ------------------------------------------- */}
                   <div className="space-y-2">
                     <Label>Status</Label>
                     <Select
@@ -731,7 +754,7 @@ const ProductsPage: React.FC = () => {
                     <div className="space-y-1">
                       <Label className="text-base">Daftar Varian</Label>
                       <p className="text-sm text-muted-foreground">
-                        Kelola nama, nilai, dan stok untuk tiap varian.
+                        Kelola stok dan harga untuk tiap varian.
                       </p>
                     </div>
                     <Button
@@ -757,7 +780,7 @@ const ProductsPage: React.FC = () => {
                           key={index}
                           className="grid grid-cols-12 gap-2 items-end border p-3 rounded-md"
                         >
-                          <div className="col-span-4 space-y-1">
+                          <div className="col-span-3 space-y-1">
                             <Label htmlFor={`v-name-${index}`}>Nama</Label>
                             <Input
                               id={`v-name-${index}`}
@@ -773,7 +796,7 @@ const ProductsPage: React.FC = () => {
                               disabled={isBusy}
                             />
                           </div>
-                          <div className="col-span-4 space-y-1">
+                          <div className="col-span-3 space-y-1">
                             <Label htmlFor={`v-value-${index}`}>Nilai</Label>
                             <Input
                               id={`v-value-${index}`}
@@ -789,7 +812,26 @@ const ProductsPage: React.FC = () => {
                               disabled={isBusy}
                             />
                           </div>
+                          {/* --- INPUT HARGA VARIAN --- */}
                           <div className="col-span-3 space-y-1">
+                            <Label htmlFor={`v-price-${index}`}>Harga</Label>
+                            <Input
+                              id={`v-price-${index}`}
+                              type="number"
+                              placeholder="Kosong = harga utama"
+                              value={variant.price ?? ""}
+                              onChange={(e) =>
+                                handleVariantChange(
+                                  index,
+                                  "price",
+                                  e.target.value
+                                )
+                              }
+                              disabled={isBusy}
+                            />
+                          </div>
+                          {/* --------------------------- */}
+                          <div className="col-span-2 space-y-1">
                             <Label htmlFor={`v-stock-${index}`}>Stok</Label>
                             <Input
                               id={`v-stock-${index}`}
@@ -827,7 +869,6 @@ const ProductsPage: React.FC = () => {
             </Tabs>
           )}
         </AdminDialog>
-        {/* ------------------------------------ */}
       </div>
     </div>
   );

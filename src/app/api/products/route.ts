@@ -1,3 +1,4 @@
+// src/app/api/products/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -6,6 +7,7 @@ import { logActivity } from '@/lib/logger'
 import { hasPermission, PERMISSIONS } from '@/lib/permissions'
 
 export async function GET(req: NextRequest) {
+  // ... (Fungsi GET tetap sama)
   try {
     const { searchParams } = new URL(req.url)
     const admin = searchParams.get('admin')
@@ -13,7 +15,7 @@ export async function GET(req: NextRequest) {
     const products = await prisma.product.findMany({
       include: {
         variants: true,
-        images: true, // <-- TAMBAHAN: Sertakan gambar galeri
+        images: true,
       },
       orderBy: {
         createdAt: 'desc',
@@ -38,13 +40,11 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    // Cek permission jika perlu, sesuaikan dengan setup Anda
     // if (!session || !hasPermission(session.user.permissions, PERMISSIONS.PRODUCTS_CREATE)) {
     //   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     // }
 
     const body = await req.json()
-    // Ambil 'images' (array string URL) dari body
     const { name, description, iconUrl, price, stock, status, enableNotes, variants, images } = body
 
     const product = await prisma.product.create({
@@ -56,26 +56,27 @@ export async function POST(req: NextRequest) {
         stock: parseInt(stock),
         status,
         enableNotes: enableNotes !== undefined ? enableNotes : true,
-        // --- TAMBAHAN: Simpan Galeri Gambar ---
         images: {
             create: images && Array.isArray(images) 
               ? images.map((url: string) => ({ url })) 
               : []
         }
-        // ------------------------------------
       },
     })
 
+    // --- LOGIKA VARIAN DIPERBARUI ---
     if (variants && variants.length > 0) {
       await prisma.variant.createMany({
         data: variants.map((v: any) => ({
           productId: product.id,
           name: v.name,
           value: v.value,
-          stock: v.stock,
+          stock: parseInt(String(v.stock)) || 0,
+          price: v.price ? parseFloat(String(v.price)) : null, // <-- TAMBAHKAN INI
         })),
       })
     }
+    // ---------------------------------
 
     if (session?.user?.id) {
         await logActivity(parseInt(session.user.id), `Created product: ${product.name}`)
