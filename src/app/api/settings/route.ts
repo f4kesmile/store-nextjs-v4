@@ -4,6 +4,8 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { logActivity } from "@/lib/logger";
 
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
   try {
     let settings = await prisma.siteSettings.findFirst();
