@@ -1,61 +1,51 @@
+// src/lib/reseller-utils.ts
+// FILE INI HANYA MENYEDIAKAN FUNGSI UTILITY DASAR DAN MANAJEMEN STORAGE
+
+// Hapus semua data RESELLER_DATA lama yang hardcoded
+
+// Interface dasar yang diperlukan oleh file lain
 export interface ResellerData {
   name: string;
   whatsapp: string;
-  commission: number;
+  commission?: number;
 }
 
-export const RESELLER_DATA: Record<string, ResellerData> = {
-  'RESELLER-A': {
-    name: 'Reseller A',
-    whatsapp: '6281234567890',
-    commission: 10
-  },
-  'RESELLER-B': {
-    name: 'Reseller B', 
-    whatsapp: '6281234567891',
-    commission: 15
-  },
-  'RESELLER-C': {
-    name: 'Reseller C',
-    whatsapp: '6281234567892', 
-    commission: 12
-  }
-};
-
-export function isValidResellerRef(ref: string): boolean {
-  return !!RESELLER_DATA[ref];
+export interface CartItem {
+  id: string;
+  name: string;
+  price: number;
+  quantity: number;
+  image?: string;
 }
 
-export function getResellerFromRef(ref: string): ResellerData | null {
-  return RESELLER_DATA[ref] || null;
+// --- Fungsi Manajamen Storage ---
+const STORAGE_KEY = 'locked_reseller_ref';
+
+export function getStoredResellerRef(): string | null {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem(STORAGE_KEY);
 }
 
+export function storeResellerRef(ref: string): void {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(STORAGE_KEY, ref);
+}
+
+export function clearStoredResellerRef(): void {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem(STORAGE_KEY);
+}
+
+// --- Fungsi Pesan WhatsApp ---
 export function generateWhatsAppLink(phone: string, message: string): string {
   const encodedMessage = encodeURIComponent(message);
   return `https://wa.me/${phone}?text=${encodedMessage}`;
 }
 
+// HAPUS: Fungsi buildCheckoutMessage yang lama
+// KARENA pesan WA kini dihasilkan oleh API /api/checkout/route.ts
+// Biarkan fungsi ini tetap ada, tapi kosong/sederhana agar tidak error di hook yang memanggilnya.
 export function buildCheckoutMessage(items: any[], total: number, resellerRef?: string): string {
-  const itemsList = items.map(item => 
-    `• ${item.name} (${item.quantity}x) - Rp ${item.price.toLocaleString()}`
-  ).join('\n');
-  
-  const resellerInfo = resellerRef ? `\n\nSumber: ${resellerRef}` : '';
-  
-  return `Halo! Saya ingin memesan:\n\n${itemsList}\n\nTotal: Rp ${total.toLocaleString()}${resellerInfo}`;
-}
-
-export function getStoredResellerRef(): string | null {
-  if (typeof window === 'undefined') return null;
-  return localStorage.getItem('locked_reseller_ref');
-}
-
-export function storeResellerRef(ref: string): void {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem('locked_reseller_ref', ref);
-}
-
-export function clearStoredResellerRef(): void {
-  if (typeof window === 'undefined') return;
-  localStorage.removeItem('locked_reseller_ref');
+  // Karena API yang menangani pembuatan pesan, fungsi ini sekarang hanya placeholder untuk hook lama.
+  return "Mohon tunggu, pesanan sedang diproses.";
 }

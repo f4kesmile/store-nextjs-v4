@@ -1,13 +1,12 @@
 import type { Metadata } from "next";
 import "./globals.css";
-
-import { Providers } from "./providers"; // <-- Hanya impor ini
+import { Providers } from "./providers";
 import { CartProvider } from "@/contexts/CartContext";
 import { ResellerProvider } from "@/contexts/ResellerContext";
-// HAPUS: 'ThemeProvider as NextThemesProvider' from "next-themes";
 import { getServerSettings } from "@/lib/server-settings";
 import HeadFavicon from "@/components/HeadFavicon";
 import { Toaster } from "sonner";
+import { Suspense } from "react"; // <-- Import Suspense
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await getServerSettings();
@@ -30,18 +29,20 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="id" suppressHydrationWarning>
+    <html lang="id">
       <body>
-        {/* HAPUS NextThemesProvider dari sini */}
-        <Providers>
-          <HeadFavicon />
-          <ResellerProvider>
-            <CartProvider>
-              {children}
-              <Toaster richColors position="top-right" visibleToasts={3} />
-            </CartProvider>
-          </ResellerProvider>
-        </Providers>
+        {/* FIX: Bungkus Providers di Suspense untuk mengatasi useSearchParams di SSR/SSG */}
+        <Suspense fallback={null}>
+          <Providers>
+            <HeadFavicon />
+            <ResellerProvider>
+              <CartProvider>
+                {children}
+                <Toaster richColors position="top-right" visibleToasts={3} />
+              </CartProvider>
+            </ResellerProvider>
+          </Providers>
+        </Suspense>
       </body>
     </html>
   );

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { PageLayout } from "@/components/layout/PageLayout";
 import { SectionHeader } from "@/components/ui/section-header";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useCart } from "@/contexts/CartContext";
 import { useReseller } from "@/contexts/ResellerContext";
-import { useResellerCart } from "@/hooks/useResellerCart";
+// HAPUS: import { useResellerCart } from "@/hooks/useResellerCart"; // Tidak lagi diperlukan
 import { toast } from "sonner";
 import {
   ShoppingCart,
@@ -20,8 +20,6 @@ import {
   Smartphone,
   Building2,
   User,
-  Phone,
-  MapPin,
 } from "lucide-react";
 
 interface CustomerInfo {
@@ -36,10 +34,9 @@ interface CustomerInfo {
 
 function CheckoutContent() {
   const { cart, getCartTotal, getCartCount, clearCart } = useCart();
-  const { lockedRef, getResellerData } = useReseller();
-  const { processCheckout, getActiveReseller } = useResellerCart();
+  // PERBAIKAN: Menggunakan activeResellerData
+  const { lockedRef, activeResellerData } = useReseller();
   const router = useRouter();
-  const searchParams = useSearchParams();
 
   const [customerInfo, setCustomerInfo] = useState<CustomerInfo>({
     name: "",
@@ -57,7 +54,7 @@ function CheckoutContent() {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Partial<CustomerInfo>>({});
 
-  const activeReseller = getActiveReseller();
+  const activeReseller = activeResellerData;
   const total = getCartTotal();
 
   // Redirect if cart is empty
@@ -75,7 +72,6 @@ function CheckoutContent() {
     if (!customerInfo.address.trim()) newErrors.address = "Alamat harus diisi";
     if (!customerInfo.city.trim()) newErrors.city = "Kota harus diisi";
 
-    // Validate phone number format
     if (
       customerInfo.phone &&
       !/^[+]?[0-9]{10,15}$/.test(customerInfo.phone.replace(/[\s-]/g, ""))
@@ -89,7 +85,6 @@ function CheckoutContent() {
 
   const handleInputChange = (field: keyof CustomerInfo, value: string) => {
     setCustomerInfo((prev) => ({ ...prev, [field]: value }));
-    // Clear error when user starts typing
     if (errors[field]) {
       setErrors((prev) => ({ ...prev, [field]: undefined }));
     }
@@ -102,47 +97,53 @@ function CheckoutContent() {
     }
 
     setLoading(true);
-    try {
-      // Convert cart items for processCheckout
-      const cartItems = cart.map((item) => ({
-        id: `${item.productId}-${item.variantId || "no-variant"}`,
-        name:
-          item.productName +
-          (item.variantName
-            ? ` (${item.variantName}: ${item.variantValue})`
-            : ""),
-        price: item.productPrice,
-        quantity: item.quantity,
-        image: item.productImage,
-      }));
+    let finalWhatsappUrl: string | undefined = undefined;
 
-      // Create transaction records if API exists
-      try {
-        const promises = cart.map((item) =>
-          fetch("/api/checkout", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              productId: item.productId,
-              variantId: item.variantId || null,
-              quantity: item.quantity,
-              resellerId: lockedRef || null,
-              customerInfo,
-              notes: item.notes,
-            }),
-          })
-        );
-        await Promise.all(promises);
-      } catch (error) {
-        console.log("API transaction failed, proceeding with WhatsApp only");
+    try {
+      // PERBAIKAN UTAMA: Looping dan menggunakan URL dari respons server
+      const promises = cart.map((item) =>
+        fetch("/api/checkout", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            productId: item.productId,
+            variantId: item.variantId || null,
+            quantity: item.quantity,
+            resellerId: lockedRef || null,
+            customerInfo, // Kirim seluruh objek customerInfo
+            notes: item.notes,
+          }),
+        })
+      );
+
+      const responses = await Promise.all(promises);
+
+      // Ambil URL WhatsApp dari respons yang berhasil
+      for (const res of responses) {
+        if (res.ok) {
+          const data = await res.json();
+          if (data.whatsappUrl) {
+            finalWhatsappUrl = data.whatsappUrl;
+            // Kita asumsikan URL dari item terakhir adalah URL yang paling informatif
+          }
+        } else {
+          console.error("API transaction failed for one item.");
+        }
       }
 
-      // Process checkout through reseller system
-      processCheckout(cartItems);
+      // HAPUS PANGGILAN processCheckout LAMA DARI useResellerCart
 
-      // Clear cart and redirect
-      clearCart();
-      toast.success("Pesanan berhasil dikirim ke WhatsApp!");
+      // Lakukan redirect hanya jika URL berhasil didapatkan
+      if (finalWhatsappUrl) {
+        clearCart();
+        toast.success("Pesanan berhasil dibuat, mengarahkan ke WhatsApp...");
+        // Redirect menggunakan URL yang dihasilkan server (yang berisi pesan detail)
+        window.open(finalWhatsappUrl, "_blank");
+      } else {
+        toast.error("Gagal membuat pesanan. Cek stok atau coba lagi.");
+        setLoading(false);
+        return;
+      }
 
       setTimeout(() => {
         router.push(lockedRef ? `/products?ref=${lockedRef}` : "/products");
@@ -169,11 +170,9 @@ function CheckoutContent() {
     return (
       <PageLayout>
         <div className="container mx-auto px-4 py-20 text-center">
-          <ShoppingCart className="mx-auto h-16 w-16 text-gray-400 mb-4" />
-          <h1 className="text-2xl font-bold text-gray-800 mb-4">
-            Keranjang Kosong
-          </h1>
-          <p className="text-gray-600 mb-8">
+          <ShoppingCart className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
+          <h1 className="text-2xl font-bold mb-4">Keranjang Kosong</h1>
+          <p className="text-muted-foreground mb-8">
             Tidak ada produk untuk di-checkout
           </p>
           <Button
@@ -200,16 +199,16 @@ function CheckoutContent() {
 
         {/* Reseller Info Banner */}
         {activeReseller && (
-          <Card className="mb-6 border-green-200 bg-green-50">
+          <Card className="mb-6 border-green-200 bg-green-50 dark:bg-green-950 dark:border-green-800">
             <CardContent className="p-4">
-              <div className="flex items-center gap-2">
-                <Building2 className="h-5 w-5 text-green-600" />
-                <span className="font-medium text-green-800">
+              <div className="flex items-center gap-2 text-green-800 dark:text-green-300">
+                <Building2 className="h-5 w-5" />
+                <span className="font-medium">
                   Pesanan via Reseller: {activeReseller.name}
                 </span>
                 <Badge
                   variant="secondary"
-                  className="bg-green-100 text-green-800"
+                  className="bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100"
                 >
                   {lockedRef}
                 </Badge>
@@ -349,17 +348,17 @@ function CheckoutContent() {
                   <div
                     className={`p-4 border rounded-lg cursor-pointer transition-colors ${
                       paymentMethod === "whatsapp"
-                        ? "border-green-500 bg-green-50"
-                        : "border-gray-200 hover:border-gray-300"
+                        ? "border-green-500 bg-green-50 dark:bg-green-900/50"
+                        : "border-border hover:border-muted-foreground"
                     }`}
                     onClick={() => setPaymentMethod("whatsapp")}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <Smartphone className="h-5 w-5 text-green-600" />
+                        <Smartphone className="h-5 w-5 text-green-600 dark:text-green-400" />
                         <div>
                           <p className="font-medium">WhatsApp Order</p>
-                          <p className="text-sm text-gray-600">
+                          <p className="text-sm text-muted-foreground">
                             Pesan langsung via WhatsApp{" "}
                             {activeReseller ? "reseller" : "toko"}
                           </p>
@@ -369,7 +368,7 @@ function CheckoutContent() {
                         className={`w-4 h-4 rounded-full border-2 ${
                           paymentMethod === "whatsapp"
                             ? "border-green-500 bg-green-500"
-                            : "border-gray-300"
+                            : "border-muted-foreground"
                         }`}
                       />
                     </div>
@@ -378,17 +377,19 @@ function CheckoutContent() {
                   <div
                     className={`p-4 border rounded-lg cursor-pointer transition-colors opacity-50 ${
                       paymentMethod === "gateway"
-                        ? "border-blue-500 bg-blue-50"
-                        : "border-gray-200"
+                        ? "border-blue-500 bg-blue-50 dark:bg-blue-900/50"
+                        : "border-border"
                     }`}
-                    onClick={() => setPaymentMethod("gateway")}
+                    onClick={() =>
+                      toast.info("Payment Gateway akan segera tersedia!")
+                    }
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <CreditCard className="h-5 w-5 text-blue-600" />
+                        <CreditCard className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                         <div>
                           <p className="font-medium">Payment Gateway</p>
-                          <p className="text-sm text-gray-600">
+                          <p className="text-sm text-muted-foreground">
                             Transfer Bank, E-wallet, dll (Segera hadir)
                           </p>
                         </div>
@@ -397,7 +398,7 @@ function CheckoutContent() {
                         className={`w-4 h-4 rounded-full border-2 ${
                           paymentMethod === "gateway"
                             ? "border-blue-500 bg-blue-500"
-                            : "border-gray-300"
+                            : "border-muted-foreground"
                         }`}
                       />
                     </div>
@@ -433,12 +434,12 @@ function CheckoutContent() {
                           {item.productName}
                         </p>
                         {item.variantName && (
-                          <p className="text-xs text-gray-600">
+                          <p className="text-xs text-muted-foreground">
                             {item.variantName}: {item.variantValue}
                           </p>
                         )}
                         <div className="flex justify-between items-center mt-1">
-                          <span className="text-sm text-gray-600">
+                          <span className="text-sm text-muted-foreground">
                             ×{item.quantity}
                           </span>
                           <span className="text-sm font-medium">
@@ -458,14 +459,14 @@ function CheckoutContent() {
                 {/* Total */}
                 <div className="space-y-2">
                   <div className="flex justify-between">
-                    <span className="text-gray-600">
+                    <span className="text-muted-foreground">
                       Subtotal ({getCartCount()} item)
                     </span>
                     <span>Rp {total.toLocaleString("id-ID")}</span>
                   </div>
                   <div className="flex justify-between font-bold text-lg">
                     <span>Total</span>
-                    <span className="text-green-600">
+                    <span className="text-primary">
                       Rp {total.toLocaleString("id-ID")}
                     </span>
                   </div>
@@ -518,7 +519,7 @@ function CheckoutContent() {
                 </div>
 
                 {activeReseller && (
-                  <div className="text-xs text-gray-500 text-center pt-2">
+                  <div className="text-xs text-muted-foreground text-center pt-2">
                     💡 Pesanan akan diproses melalui {activeReseller.name}
                   </div>
                 )}

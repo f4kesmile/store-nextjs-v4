@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, Suspense } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
+
 import { useCart } from "@/contexts/CartContext";
 import { SiteNavbar } from "@/components/site-navbar";
 import { Button } from "@/components/ui/button";

@@ -229,12 +229,12 @@ export default function TransactionsPage() {
       render: (status: Transaction["status"]) => (
         <Badge
           variant={(() => {
-            if (status === "PENDING") return "secondary" as const;
+            if (status === "PENDING") return "warning" as const;
             if (status === "CONFIRMED" || status === "SHIPPED")
-              return "secondary" as const;
-            if (status === "COMPLETED") return "default" as const;
-            if (status === "CANCELLED") return "destructive" as const;
-            return "secondary" as const;
+              return "info" as const;
+            if (status === "COMPLETED") return "success" as const;
+            if (status === "CANCELLED") return "danger" as const;
+            return "secondary" as const; // Default fallback
           })()}
         >
           {status}

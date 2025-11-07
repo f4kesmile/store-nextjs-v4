@@ -52,6 +52,23 @@ const config = {
           DEFAULT: "var(--card)",
           foreground: "var(--card-foreground)",
         },
+        // === TAMBAHAN UNTUK STATUS ===
+        success: {
+          DEFAULT: "var(--success)",
+          foreground: "var(--success-foreground)",
+        },
+        warning: {
+          DEFAULT: "var(--warning)",
+          foreground: "var(--warning-foreground)",
+        },
+        info: {
+          DEFAULT: "var(--info)",
+          foreground: "var(--info-foreground)",
+        },
+        danger: {
+          DEFAULT: "var(--danger)",
+          foreground: "var(--danger-foreground)",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",

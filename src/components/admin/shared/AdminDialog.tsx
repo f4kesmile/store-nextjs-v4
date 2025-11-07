@@ -20,7 +20,7 @@ interface AdminDialogProps {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   size?: "sm" | "md" | "lg" | "xl" | "full";
-  showCloseButton?: boolean; // Prop ini tidak lagi digunakan, tapi kita biarkan agar tidak error
+  showCloseButton?: boolean;
   footer?: React.ReactNode;
   className?: string;
 }
@@ -33,26 +33,24 @@ const AdminDialog: React.FC<AdminDialogProps> = ({
   open,
   onOpenChange,
   size = "md",
-  showCloseButton = true, // Tidak terpakai lagi
   footer,
   className,
 }) => {
   const sizeClasses = {
-    sm: "max-w-sm",
-    md: "max-w-md",
-    lg: "max-w-lg",
-    xl: "max-w-xl",
-    full: "max-w-full mx-4",
+    sm: "max-w-md",
+    md: "max-w-lg", // Ukuran medium diatur ke max-w-lg
+    lg: "max-w-2xl",
+    xl: "max-w-4xl",
+    full: "max-w-7xl",
   };
 
   const responsiveClasses = cn(
     "w-full",
     sizeClasses[size],
-    // Mobile: full screen on small devices
-    "sm:max-w-full sm:h-full sm:rounded-none",
     // Desktop: centered modal
-    "md:max-h-[90vh] md:rounded-lg",
-    size === "full" ? "max-w-7xl" : sizeClasses[size]
+    "md:max-h-[90vh] md:rounded-xl",
+    // Mobile: full screen on small devices
+    "max-sm:m-0 max-sm:w-full max-sm:h-full max-sm:rounded-none max-sm:border-0"
   );
 
   return (
@@ -61,11 +59,10 @@ const AdminDialog: React.FC<AdminDialogProps> = ({
       <DialogContent
         className={cn(
           responsiveClasses,
-          "backdrop-blur-sm bg-[hsl(var(--card))] border border-[hsl(var(--border))] shadow-xl",
-          // Mobile adjustments
-          "max-sm:m-0 max-sm:w-full max-sm:h-full max-sm:rounded-none max-sm:border-0",
-          // Desktop adjustments
-          "sm:m-4",
+          // PERBAIKAN UTAMA: Menggunakan variabel CSS untuk background dan border
+          "bg-[hsl(var(--card))] text-[hsl(var(--foreground))] border border-[hsl(var(--border))] shadow-2xl",
+          // Pastikan DialogContent selalu ada di tengah
+          "fixed left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%]",
           className
         )}
       >
@@ -74,10 +71,7 @@ const AdminDialog: React.FC<AdminDialogProps> = ({
             <DialogTitle className="text-xl font-semibold text-[hsl(var(--foreground))] flex-1">
               {title}
             </DialogTitle>
-
-            {/* === TOMBOL X YANG GANDA DIHAPUS DARI SINI ===
-              Komponen DialogContent (dari ui/dialog.tsx) sudah menyediakannya.
-            */}
+            {/* Tombol Close sudah otomatis ada di ui/dialog.tsx */}
           </div>
           {description && (
             <DialogDescription className="text-[hsl(var(--muted-foreground))]">
@@ -86,10 +80,12 @@ const AdminDialog: React.FC<AdminDialogProps> = ({
           )}
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto py-4">{children}</div>
+        <div className="flex-1 max-h-[70vh] overflow-y-auto pr-1">
+          {children}
+        </div>
 
         {footer && (
-          <DialogFooter className="pt-4 border-t border-[hsl(var(--border))] bg-[hsl(var(--card))] -mx-6 -mb-6 px-6 pb-6 rounded-b-lg">
+          <DialogFooter className="pt-4 border-t border-[hsl(var(--border))] bg-[hsl(var(--card))] -mx-6 -mb-6 px-6 pb-6 rounded-b-xl">
             {footer}
           </DialogFooter>
         )}
