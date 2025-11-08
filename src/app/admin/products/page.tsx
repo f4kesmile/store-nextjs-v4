@@ -25,7 +25,7 @@ import {
   Package,
   Plus,
   Package2,
-  ImageIcon,
+  Image as ImageIcon,
   Loader2,
   Upload,
   X,
@@ -38,6 +38,8 @@ import { cn } from "@/lib/utils";
 import ImageWithFallback from "@/components/ImageWithFallback";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 
 // --- INTERFACE DIPERBARUI ---
 interface Variant {
@@ -46,7 +48,7 @@ interface Variant {
   value: string;
   stock: number;
   price?: number | null;
-  status?: "ACTIVE" | "INACTIVE"; // [FITUR] Tambah status
+  status?: "ACTIVE" | "INACTIVE";
 }
 interface ProductImage {
   id: number;
@@ -70,6 +72,9 @@ type ProductFormData = Partial<Omit<Product, "images" | "variants">> & {
   galleryUrls?: string[];
   variants?: Variant[];
 };
+
+// [FIX] Tipe baru untuk field varian yang bisa diedit
+type EditableVariantField = "name" | "value" | "stock" | "price" | "status";
 // -----------------------------
 
 const formatRupiah = (amount: number) =>
@@ -104,7 +109,7 @@ const ProductsPage: React.FC = () => {
           variants: p.variants.map((v: any) => ({
             ...v,
             price: v.price ? parseFloat(v.price) : null,
-            status: v.status || "ACTIVE", // [FITUR] Pastikan status ada
+            status: v.status || "ACTIVE",
           })),
         }));
         setProducts(formattedData);
@@ -143,8 +148,8 @@ const ProductsPage: React.FC = () => {
       galleryUrls: product.images.map((img) => img.url),
       variants: product.variants.map((v) => ({
         ...v,
-        price: v.price ? Number(v.price) : null, // Pastikan adalah number
-        status: v.status || "ACTIVE", // [FITUR] Pastikan status ada
+        price: v.price ? Number(v.price) : null,
+        status: v.status || "ACTIVE",
       })),
     });
     setIsDialogOpen(true);
@@ -178,12 +183,11 @@ const ProductsPage: React.FC = () => {
       : `/api/products/${selectedProduct.id}`;
     const method = isCreateMode ? "POST" : "PUT";
 
-    // Siapkan varian, pastikan harga adalah angka atau null
     const formattedVariants = (selectedProduct.variants || []).map((v) => ({
       ...v,
       price: v.price ? parseFloat(String(v.price)) : null,
       stock: parseInt(String(v.stock)) || 0,
-      status: v.status || "ACTIVE", // [FITUR] Sertakan status
+      status: v.status || "ACTIVE",
     }));
 
     const mainPayload = {
@@ -212,8 +216,6 @@ const ProductsPage: React.FC = () => {
 
       const savedProduct = await res.json();
 
-      // [FIX] Logika update varian HARUS dijalankan juga saat !isCreateMode
-      // Ini adalah bagian dari perbaikan Bug #1
       if (!isCreateMode) {
         const variantRes = await fetch(
           `/api/products/${savedProduct.id}/variants`,
@@ -243,26 +245,41 @@ const ProductsPage: React.FC = () => {
     setSelectedProduct((prev) => (prev ? { ...prev, [field]: value } : null));
   };
 
+  // [FIX] Ini adalah fungsi handleVariantChange yang sudah diketik dengan benar
   const handleVariantChange = (
     index: number,
-    field: keyof Variant,
+    field: EditableVariantField, // <-- Menggunakan tipe baru
     value: string | number | null
   ) => {
     setSelectedProduct((prev) => {
       if (!prev || !prev.variants) return prev;
+
       const newVariants = [...prev.variants];
+      // Salin varian yang akan diubah
       const targetVariant = { ...newVariants[index] };
 
-      if (field === "stock") {
-        targetVariant[field] = parseInt(String(value)) || 0;
-      } else if (field === "price") {
-        // Izinkan null atau angka
-        targetVariant[field] =
-          value === null || value === "" ? null : parseFloat(String(value));
-      } else {
-        (targetVariant as any)[field] = value;
+      // Gunakan switch untuk type safety
+      switch (field) {
+        case "stock":
+          targetVariant.stock = parseInt(String(value)) || 0;
+          break;
+        case "price":
+          targetVariant.price =
+            value === null || value === "" ? null : parseFloat(String(value));
+          break;
+        case "name":
+          targetVariant.name = String(value);
+          break;
+        case "value":
+          targetVariant.value = String(value);
+          break;
+        case "status":
+          // Kita bisa aman melakukan cast di sini karena Select hanya memberi 2 nilai ini
+          targetVariant.status = value as "ACTIVE" | "INACTIVE";
+          break;
       }
 
+      // Masukkan kembali varian yang sudah diubah ke array
       newVariants[index] = targetVariant;
       return { ...prev, variants: newVariants };
     });
@@ -279,7 +296,7 @@ const ProductsPage: React.FC = () => {
           stock: 0,
           price: null,
           status: "ACTIVE",
-        }, // [FITUR] Tambah status
+        },
       ],
     }));
   };
@@ -291,7 +308,6 @@ const ProductsPage: React.FC = () => {
     }));
   };
 
-  // Handler Upload (Icon & Gallery) tetap sama...
   const handleIconUpload = async (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
@@ -409,14 +425,13 @@ const ProductsPage: React.FC = () => {
       key: "price",
       label: "Harga",
       render: (v: number, product: Product) => {
-        // --- TAMPILAN HARGA DIPERBARUI ---
         if (product.variants && product.variants.length > 0) {
           const prices = product.variants
             .map((v) => v.price ?? product.price)
             .filter(Boolean);
           if (prices.length === 0) return formatRupiah(product.price);
-          const min = Math.min(...prices);
-          const max = Math.max(...prices);
+          const min = Math.min(...(prices as number[]));
+          const max = Math.max(...(prices as number[]));
           if (min === max) return formatRupiah(min);
           return (
             <span className="font-medium">
@@ -425,7 +440,6 @@ const ProductsPage: React.FC = () => {
           );
         }
         return <span className="font-medium">{formatRupiah(v)}</span>;
-        // ---------------------------------
       },
     },
     {
@@ -434,7 +448,7 @@ const ProductsPage: React.FC = () => {
       render: (v: number, product: Product) => {
         if (product.variants && product.variants.length > 0) {
           const totalVariantStock = product.variants
-            .filter((v) => v.status === "ACTIVE") // [FITUR] Hanya hitung stok aktif
+            .filter((v) => v.status === "ACTIVE")
             .reduce((acc, v) => acc + v.stock, 0);
           return (
             <div className="flex items-center gap-2">
@@ -495,7 +509,6 @@ const ProductsPage: React.FC = () => {
   return (
     <div className="min-h-screen p-4 sm:p-6">
       <div className="max-w-7xl mx-auto space-y-6">
-        {/* ... (Header halaman tetap sama) ... */}
         <div className="flex justify-between items-center">
           <h1 className="text-2xl font-bold">Produk</h1>
           <Button onClick={handleCreateProduct} className="gap-2">
@@ -507,18 +520,139 @@ const ProductsPage: React.FC = () => {
           title="Semua Produk"
           description={`${filteredProducts.length} produk ditemukan`}
         >
-          <AdminTable
-            columns={columns}
-            data={filteredProducts}
-            loading={loading}
-            searchable
-            searchValue={searchValue}
-            onSearchChange={setSearchValue}
-            searchPlaceholder="Cari produk..."
-          />
+          {/* Tampilan Tabel Desktop */}
+          <div className="hidden md:block">
+            <AdminTable
+              columns={columns}
+              data={filteredProducts}
+              loading={loading}
+              searchable
+              searchValue={searchValue}
+              onSearchChange={setSearchValue}
+              searchPlaceholder="Cari produk..."
+            />
+          </div>
+
+          {/* [MODIFIKASI] Tampilan Card Mobile */}
+          <div className="block md:hidden">
+            <Input
+              placeholder="Cari produk..."
+              value={searchValue}
+              onChange={(e) => setSearchValue(e.target.value)}
+              className="mb-4"
+            />
+            {loading ? (
+              <div className="space-y-3">
+                {[...Array(3)].map((_, i) => (
+                  <Card key={i} className="p-4">
+                    <div className="flex gap-3">
+                      <Skeleton className="w-16 h-16 rounded-md" />
+                      <div className="flex-1 space-y-2">
+                        <Skeleton className="h-5 w-3/4" />
+                        <Skeleton className="h-4 w-1/2" />
+                        <Skeleton className="h-4 w-1/4" />
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            ) : filteredProducts.length === 0 ? (
+              <p className="text-center text-muted-foreground py-10">
+                Produk tidak ditemukan.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {filteredProducts.map((product) => (
+                  <Card key={product.id} className="p-4">
+                    <div className="flex items-start gap-3">
+                      <ImageWithFallback
+                        src={product.iconUrl}
+                        alt={product.name}
+                        className="w-16 h-16 rounded-md border"
+                      />
+                      <div className="flex-1">
+                        <p className="font-medium leading-tight">
+                          {product.name}
+                        </p>
+
+                        {/* [FIX] Render harga langsung */}
+                        <p className="text-sm font-medium text-primary mt-1">
+                          {(() => {
+                            if (
+                              product.variants &&
+                              product.variants.length > 0
+                            ) {
+                              const prices = product.variants
+                                .map((v) => v.price ?? product.price)
+                                .filter(Boolean);
+                              if (prices.length === 0)
+                                return formatRupiah(product.price);
+                              const min = Math.min(...(prices as number[]));
+                              const max = Math.max(...(prices as number[]));
+                              if (min === max) return formatRupiah(min);
+                              return (
+                                <span className="font-medium">
+                                  {formatRupiah(min)} - {formatRupiah(max)}
+                                </span>
+                              );
+                            }
+                            return (
+                              <span className="font-medium">
+                                {formatRupiah(product.price)}
+                              </span>
+                            );
+                          })()}
+                        </p>
+                      </div>
+                      <ActionDropdown
+                        actions={createCommonActions.crud(
+                          undefined,
+                          () => handleEditProduct(product),
+                          () => handleDeleteProduct(product)
+                        )}
+                      />
+                    </div>
+                    <div className="mt-3 flex items-center justify-between">
+                      {/* [FIX] Render stok langsung */}
+                      {(() => {
+                        if (product.variants && product.variants.length > 0) {
+                          const totalVariantStock = product.variants
+                            .filter((v) => v.status === "ACTIVE")
+                            .reduce((acc, v) => acc + v.stock, 0);
+                          return (
+                            <div className="flex items-center gap-2">
+                              <Database className="w-4 h-4 text-muted-foreground" />
+                              <span className="font-medium">
+                                {totalVariantStock}
+                              </span>
+                              <Badge variant="outline">
+                                {product.variants.length} Varian
+                              </Badge>
+                            </div>
+                          );
+                        }
+                        return (
+                          <div className="flex items-center gap-2">
+                            <Package2 className="w-4 h-4 text-muted-foreground" />
+                            <span className="font-medium">{product.stock}</span>
+                            <StatusBadge
+                              status={getStockStatus(product.stock)}
+                            />
+                          </div>
+                        );
+                      })()}
+
+                      {/* [FIX] Render status langsung */}
+                      <StatusBadge status={product.status} />
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
         </AdminCard>
 
-        {/* --- DIALOG DIMODIFIKASI DENGAN TABS --- */}
+        {/* Dialog Edit/Create (Tidak berubah) */}
         <AdminDialog
           open={isDialogOpen}
           onOpenChange={setIsDialogOpen}
@@ -553,7 +687,6 @@ const ProductsPage: React.FC = () => {
               {/* TAB 1: INFORMASI UTAMA */}
               <TabsContent value="info">
                 <FormGrid columns={2}>
-                  {/* ... (Nama, Deskripsi, Cover, Galeri tetap sama) ... */}
                   <div className="space-y-2 md:col-span-2">
                     <Label>Nama Produk</Label>
                     <Input
@@ -625,7 +758,6 @@ const ProductsPage: React.FC = () => {
                     <Label>
                       Galeri ({selectedProduct.galleryUrls?.length || 0})
                     </Label>
-                    {/* ... (Kode upload galeri tetap sama) ... */}
                     <div className="space-y-3">
                       <div className="flex gap-2">
                         <Input
@@ -683,7 +815,6 @@ const ProductsPage: React.FC = () => {
                       )}
                     </div>
                   </div>
-                  {/* --- INPUT HARGA & STOK UTAMA DIMODIFIKASI --- */}
                   <div className="space-y-2">
                     <Label>Harga Utama (IDR)</Label>
                     <Input
@@ -720,7 +851,6 @@ const ProductsPage: React.FC = () => {
                       </p>
                     )}
                   </div>
-                  {/* ------------------------------------------- */}
                   <div className="space-y-2">
                     <Label>Status Produk</Label>
                     <Select
@@ -786,7 +916,6 @@ const ProductsPage: React.FC = () => {
                     </div>
                   ) : (
                     <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
-                      {/* [FITUR] Mengubah grid layout untuk menambah status */}
                       {selectedProduct.variants?.map((variant, index) => (
                         <div
                           key={index}
@@ -858,7 +987,6 @@ const ProductsPage: React.FC = () => {
                               disabled={isBusy}
                             />
                           </div>
-                          {/* [FITUR] Input Status Varian */}
                           <div className="col-span-1">
                             <Label htmlFor={`v-status-${index}`}>Status</Label>
                             <Select
@@ -880,7 +1008,6 @@ const ProductsPage: React.FC = () => {
                               </SelectContent>
                             </Select>
                           </div>
-                          {/* --------------------------- */}
                           <div className="col-span-1">
                             <Label>&nbsp;</Label>
                             <Button

@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { toast } from "sonner"; // Ganti import
+import { toast } from "sonner";
 import AdminCard from "@/components/admin/shared/AdminCard";
 import AdminTable from "@/components/admin/shared/AdminTable";
 import {
@@ -22,6 +22,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import TransactionExportButton from "@/components/TransactionExportButton";
 import { Download, Plus } from "lucide-react";
+import { Card } from "@/components/ui/card"; // [MODIFIKASI] Import Card
+import { Skeleton } from "@/components/ui/skeleton"; // [MODIFIKASI] Import Skeleton
 
 // Tipe data berdasarkan Prisma schema Anda
 interface Transaction {
@@ -61,7 +63,6 @@ export default function TransactionsPage() {
   const [searchValue, setSearchValue] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
 
-  // State untuk modal
   const [showModal, setShowModal] = useState(false);
   const [editingTransaction, setEditingTransaction] =
     useState<Transaction | null>(null);
@@ -72,7 +73,6 @@ export default function TransactionsPage() {
     customerPhone: "",
   });
 
-  // Fungsi untuk mengambil data dari API
   const fetchTransactions = async () => {
     setLoading(true);
     try {
@@ -91,7 +91,6 @@ export default function TransactionsPage() {
     }
   };
 
-  // Panggil fungsi fetch saat halaman dimuat
   useEffect(() => {
     fetchTransactions();
   }, []);
@@ -113,7 +112,7 @@ export default function TransactionsPage() {
         });
         setShowModal(false);
         setEditingTransaction(null);
-        fetchTransactions(); // Muat ulang data
+        fetchTransactions();
       } else {
         toast.error("Gagal", {
           description: "Gagal mengupdate transaksi.",
@@ -133,7 +132,7 @@ export default function TransactionsPage() {
       const res = await fetch(`/api/transactions/${id}`, { method: "DELETE" });
       if (res.ok) {
         toast.success("Berhasil", { description: "Transaksi dihapus." });
-        fetchTransactions(); // Muat ulang data
+        fetchTransactions();
       } else {
         toast.error("Gagal", {
           description: "Gagal menghapus transaksi.",
@@ -164,7 +163,14 @@ export default function TransactionsPage() {
       });
   }, [transactions, searchValue, filterStatus]);
 
-  // Definisikan kolom untuk AdminTable
+  const getStatusBadgeVariant = (status: Transaction["status"]) => {
+    if (status === "PENDING") return "warning" as const;
+    if (status === "CONFIRMED" || status === "SHIPPED") return "info" as const;
+    if (status === "COMPLETED") return "success" as const;
+    if (status === "CANCELLED") return "danger" as const;
+    return "secondary" as const;
+  };
+
   const columns = [
     {
       key: "id",
@@ -227,18 +233,7 @@ export default function TransactionsPage() {
       key: "status",
       label: "Status",
       render: (status: Transaction["status"]) => (
-        <Badge
-          variant={(() => {
-            if (status === "PENDING") return "warning" as const;
-            if (status === "CONFIRMED" || status === "SHIPPED")
-              return "info" as const;
-            if (status === "COMPLETED") return "success" as const;
-            if (status === "CANCELLED") return "danger" as const;
-            return "secondary" as const; // Default fallback
-          })()}
-        >
-          {status}
-        </Badge>
+        <Badge variant={getStatusBadgeVariant(status)}>{status}</Badge>
       ),
     },
     {
@@ -289,16 +284,44 @@ export default function TransactionsPage() {
           title="Semua Transaksi"
           description={`${filteredTransactions.length} transaksi ditemukan`}
         >
-          <AdminTable
-            columns={columns}
-            data={filteredTransactions}
-            loading={loading}
-            searchable
-            searchValue={searchValue}
-            onSearchChange={setSearchValue}
-            searchPlaceholder="Cari ID, produk, customer..."
-            emptyMessage="Transaksi tidak ditemukan"
-            filters={
+          {/* [MODIFIKASI] Tampilan Tabel Desktop */}
+          <div className="hidden md:block">
+            <AdminTable
+              columns={columns}
+              data={filteredTransactions}
+              loading={loading}
+              searchable
+              searchValue={searchValue}
+              onSearchChange={setSearchValue}
+              searchPlaceholder="Cari ID, produk, customer..."
+              emptyMessage="Transaksi tidak ditemukan"
+              filters={
+                <Select value={filterStatus} onValueChange={setFilterStatus}>
+                  <SelectTrigger className="w-40">
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Semua Status</SelectItem>
+                    <SelectItem value="PENDING">Pending</SelectItem>
+                    <SelectItem value="CONFIRMED">Confirmed</SelectItem>
+                    <SelectItem value="SHIPPED">Shipped</SelectItem>
+                    <SelectItem value="COMPLETED">Completed</SelectItem>
+                    <SelectItem value="CANCELLED">Cancelled</SelectItem>
+                  </SelectContent>
+                </Select>
+              }
+            />
+          </div>
+
+          {/* [MODIFIKASI] Tampilan Card Mobile */}
+          <div className="block md:hidden">
+            <div className="flex gap-2 mb-4">
+              <Input
+                placeholder="Cari ID, produk..."
+                value={searchValue}
+                onChange={(e) => setSearchValue(e.target.value)}
+                className="flex-1"
+              />
               <Select value={filterStatus} onValueChange={setFilterStatus}>
                 <SelectTrigger className="w-40">
                   <SelectValue placeholder="Status" />
@@ -312,11 +335,84 @@ export default function TransactionsPage() {
                   <SelectItem value="CANCELLED">Cancelled</SelectItem>
                 </SelectContent>
               </Select>
-            }
-          />
+            </div>
+            {loading ? (
+              <div className="space-y-3">
+                {[...Array(3)].map((_, i) => (
+                  <Card key={i} className="p-4">
+                    <div className="flex justify-between">
+                      <Skeleton className="h-5 w-20" />
+                      <Skeleton className="h-5 w-1/4" />
+                    </div>
+                    <Skeleton className="h-4 w-3/4 mt-2" />
+                    <Skeleton className="h-4 w-1/2 mt-1" />
+                  </Card>
+                ))}
+              </div>
+            ) : filteredTransactions.length === 0 ? (
+              <p className="text-center text-muted-foreground py-10">
+                Transaksi tidak ditemukan.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {filteredTransactions.map((t) => (
+                  <Card key={t.id} className="p-4">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className="font-mono text-sm font-semibold">
+                          #{t.id}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatDate(t.createdAt)}
+                        </p>
+                      </div>
+                      <ActionDropdown
+                        actions={[
+                          {
+                            label: "Edit",
+                            onClick: () => {
+                              setEditingTransaction(t);
+                              setFormData({
+                                status: t.status,
+                                notes: t.notes || "",
+                                customerName: t.customerName || "",
+                                customerPhone: t.customerPhone || "",
+                              });
+                              setShowModal(true);
+                            },
+                          },
+                          {
+                            label: "Hapus",
+                            onClick: () => handleDeleteTransaction(t.id),
+                            variant: "destructive",
+                          },
+                        ]}
+                      />
+                    </div>
+                    <div className="mt-2 space-y-1">
+                      <p className="font-medium truncate">
+                        {t.product?.name || "Produk Dihapus"}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {t.customerName || "-"}
+                      </p>
+                      <div className="flex justify-between items-center pt-1">
+                        <span className="font-semibold text-primary">
+                          {formatPrice(Number(t.totalPrice))}
+                        </span>
+                        <Badge variant={getStatusBadgeVariant(t.status)}>
+                          {t.status}
+                        </Badge>
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
         </AdminCard>
 
-        {/* Modal Edit */}
+        {/* Modal Edit (Tidak berubah) */}
         {showModal && editingTransaction && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <div className="bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-xl max-w-md w-full p-6">

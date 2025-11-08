@@ -19,6 +19,8 @@ import { Badge } from "@/components/ui/badge";
 import { Shield, Plus, Users, Lock } from "lucide-react";
 import { toast } from "sonner";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Card } from "@/components/ui/card"; // [MODIFIKASI] Import Card
+import { Skeleton } from "@/components/ui/skeleton"; // [MODIFIKASI] Import Skeleton
 
 interface Role {
   id: number;
@@ -167,7 +169,6 @@ export default function RolesManagement() {
     }));
   };
 
-  // Group permissions by category
   const permissionGroups = useMemo(
     () => ({
       Products: Object.values(PERMISSIONS).filter((p) =>
@@ -280,18 +281,85 @@ export default function RolesManagement() {
           title="Daftar Role"
           description={`${filteredRoles.length} role tersedia`}
         >
-          <AdminTable
-            columns={columns}
-            data={filteredRoles}
-            loading={loading}
-            searchable
-            searchValue={searchValue}
-            onSearchChange={setSearchValue}
-            searchPlaceholder="Cari role..."
-          />
+          {/* [MODIFIKASI] Tampilan Tabel Desktop */}
+          <div className="hidden md:block">
+            <AdminTable
+              columns={columns}
+              data={filteredRoles}
+              loading={loading}
+              searchable
+              searchValue={searchValue}
+              onSearchChange={setSearchValue}
+              searchPlaceholder="Cari role..."
+            />
+          </div>
+
+          {/* [MODIFIKASI] Tampilan Card Mobile */}
+          <div className="block md:hidden">
+            <Input
+              placeholder="Cari role..."
+              value={searchValue}
+              onChange={(e) => setSearchValue(e.target.value)}
+              className="mb-4"
+            />
+            {loading ? (
+              <div className="space-y-3">
+                {[...Array(3)].map((_, i) => (
+                  <Card key={i} className="p-4">
+                    <Skeleton className="h-5 w-1/2" />
+                    <div className="flex justify-between mt-2">
+                      <Skeleton className="h-4 w-1/4" />
+                      <Skeleton className="h-4 w-1/3" />
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            ) : filteredRoles.length === 0 ? (
+              <p className="text-center text-muted-foreground py-10">
+                Role tidak ditemukan.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {filteredRoles.map((role) => (
+                  <Card key={role.id} className="p-4">
+                    <div className="flex justify-between items-start">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{role.name}</span>
+                        {role.name === "DEVELOPER" && (
+                          <Badge
+                            variant="destructive"
+                            className="text-[10px] px-1.5 py-0.5"
+                          >
+                            <Lock className="w-3 h-3 mr-1" /> Protected
+                          </Badge>
+                        )}
+                      </div>
+                      <ActionDropdown
+                        disabled={role.name === "DEVELOPER"}
+                        actions={createCommonActions.crud(
+                          undefined,
+                          () => handleEditRole(role),
+                          () => handleDeleteRole(role)
+                        )}
+                      />
+                    </div>
+                    <div className="mt-2 flex justify-between items-center text-sm">
+                      <div className="flex items-center gap-1 text-muted-foreground">
+                        <Users className="w-4 h-4" />
+                        <span>{role._count?.users || 0} Users</span>
+                      </div>
+                      <Badge variant="outline">
+                        {role.permissions.length} Access
+                      </Badge>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
         </AdminCard>
 
-        {/* Modal Create/Edit Role */}
+        {/* Modal Create/Edit Role (Tidak berubah) */}
         <AdminDialog
           open={showModal}
           onOpenChange={setShowModal}
@@ -327,7 +395,7 @@ export default function RolesManagement() {
                     name: e.target.value.toUpperCase(),
                   }))
                 }
-                disabled={!!editingRole} // Nama role sebaiknya tidak diubah jika sudah dibuat untuk konsistensi, atau buka jika perlu.
+                disabled={!!editingRole}
               />
               <p className="text-xs text-muted-foreground">
                 Nama role akan otomatis dikonversi ke HURUF BESAR.

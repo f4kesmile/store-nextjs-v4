@@ -21,7 +21,9 @@ import {
   SelectValue,
 } from "../../../components/ui/select";
 import { Users, UserPlus, Calendar } from "lucide-react";
-import { toast } from "sonner"; // Ganti import
+import { toast } from "sonner";
+import { Card } from "@/components/ui/card"; // [MODIFIKASI] Import Card
+import { Skeleton } from "@/components/ui/skeleton"; // [MODIFIKASI] Import Skeleton
 
 // Interface berdasarkan data API Anda (dari /api/users/route.ts)
 interface Role {
@@ -39,7 +41,6 @@ interface User {
 }
 
 const UsersPage: React.FC = () => {
-  // Ganti data statis dengan state kosong
   const [users, setUsers] = useState<User[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,7 +50,6 @@ const UsersPage: React.FC = () => {
   const [isCreateMode, setIsCreateMode] = useState(false);
   const [searchValue, setSearchValue] = useState("");
 
-  // Fungsi untuk mengambil data
   const fetchUsers = async () => {
     setLoading(true);
     try {
@@ -76,7 +76,6 @@ const UsersPage: React.FC = () => {
     }
   };
 
-  // Panggil fetch saat komponen dimuat
   useEffect(() => {
     fetchUsers();
     fetchRoles();
@@ -106,7 +105,7 @@ const UsersPage: React.FC = () => {
           toast.success("User dihapus", {
             description: `${user.username} telah dihapus.`,
           });
-          fetchUsers(); // Muat ulang data
+          fetchUsers();
         } else {
           toast.error("Gagal menghapus");
         }
@@ -119,7 +118,6 @@ const UsersPage: React.FC = () => {
   const handleSaveUser = async () => {
     if (!selectedUser) return;
 
-    // Siapkan payload, hapus password jika kosong
     const payload = { ...selectedUser };
     if (payload.password === "") {
       delete payload.password;
@@ -141,7 +139,7 @@ const UsersPage: React.FC = () => {
         });
         setIsDialogOpen(false);
         setSelectedUser(null);
-        fetchUsers(); // Muat ulang data
+        fetchUsers();
       } else {
         const err = await res.json();
         toast.error("Gagal menyimpan", {
@@ -161,7 +159,6 @@ const UsersPage: React.FC = () => {
     });
   };
 
-  // Sesuaikan kolom dengan data dari API
   const columns = [
     {
       key: "username",
@@ -205,13 +202,10 @@ const UsersPage: React.FC = () => {
       key: "actions",
       label: "Aksi",
       className: "w-12",
-      render: (
-        _: any,
-        user: User // <-- FIX implicit 'any'
-      ) => (
+      render: (_: any, user: User) => (
         <ActionDropdown
           actions={createCommonActions.crud(
-            undefined, // Tidak ada view, langsung edit
+            undefined,
             () => handleEditUser(user),
             () => handleDeleteUser(user)
           )}
@@ -238,7 +232,6 @@ const UsersPage: React.FC = () => {
   return (
     <div className="min-h-screen p-4 sm:p-6">
       <div className="max-w-7xl mx-auto space-y-6">
-        {/* Header */}
         <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold">Users Management</h1>
@@ -255,24 +248,94 @@ const UsersPage: React.FC = () => {
           </Button>
         </div>
 
-        {/* Users Table */}
         <AdminCard
           title="All Users"
           description={`${filteredUsers.length} users ditemukan`}
         >
-          <AdminTable
-            columns={columns}
-            data={filteredUsers}
-            loading={loading}
-            searchable
-            searchValue={searchValue}
-            onSearchChange={setSearchValue}
-            searchPlaceholder="Cari user, email, atau role..."
-            emptyMessage="User tidak ditemukan"
-          />
+          {/* [MODIFIKASI] Tampilan Tabel Desktop */}
+          <div className="hidden md:block">
+            <AdminTable
+              columns={columns}
+              data={filteredUsers}
+              loading={loading}
+              searchable
+              searchValue={searchValue}
+              onSearchChange={setSearchValue}
+              searchPlaceholder="Cari user, email, atau role..."
+              emptyMessage="User tidak ditemukan"
+            />
+          </div>
+
+          {/* [MODIFIKASI] Tampilan Card Mobile */}
+          <div className="block md:hidden">
+            <Input
+              placeholder="Cari user, email, atau role..."
+              value={searchValue}
+              onChange={(e) => setSearchValue(e.target.value)}
+              className="mb-4"
+            />
+            {loading ? (
+              <div className="space-y-3">
+                {[...Array(3)].map((_, i) => (
+                  <Card key={i} className="p-4">
+                    <div className="flex gap-3">
+                      <Skeleton className="w-10 h-10 rounded-full" />
+                      <div className="flex-1 space-y-2">
+                        <Skeleton className="h-5 w-3/4" />
+                        <Skeleton className="h-4 w-1/2" />
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            ) : filteredUsers.length === 0 ? (
+              <p className="text-center text-muted-foreground py-10">
+                User tidak ditemukan.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {filteredUsers.map((user) => (
+                  <Card key={user.id} className="p-4">
+                    <div className="flex justify-between items-start">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center shrink-0">
+                          <Users className="w-5 h-5 text-primary" />
+                        </div>
+                        <div>
+                          <p className="font-medium">{user.username}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {user.email}
+                          </p>
+                        </div>
+                      </div>
+                      <ActionDropdown
+                        actions={createCommonActions.crud(
+                          undefined,
+                          () => handleEditUser(user),
+                          () => handleDeleteUser(user)
+                        )}
+                      />
+                    </div>
+                    <div className="mt-3 flex justify-between items-center">
+                      <StatusBadge
+                        status={user.role.name}
+                        variant={
+                          user.role.name === "DEVELOPER" ? "danger" : "default"
+                        }
+                      />
+                      <div className="flex items-center gap-1 text-xs text-[hsl(var(--muted-foreground))]">
+                        <Calendar className="w-3 h-3" />
+                        {formatDate(user.createdAt)}
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
         </AdminCard>
 
-        {/* User Dialog */}
+        {/* User Dialog (Tidak berubah) */}
         <AdminDialog
           open={isDialogOpen}
           onOpenChange={setIsDialogOpen}
@@ -324,7 +387,6 @@ const UsersPage: React.FC = () => {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="role">Role</Label>
-                  {/* FIX: Ganti defaultValue dengan value dan onValueChange */}
                   <Select
                     value={String(selectedUser.roleId || "")}
                     onValueChange={(value) =>
