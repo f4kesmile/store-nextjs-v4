@@ -9,7 +9,6 @@ import { hasPermission, PERMISSIONS } from '@/lib/permissions'
 export const dynamic = 'force-dynamic'
 
 export async function GET(req: NextRequest) {
-  // ... (Fungsi GET tetap sama)
   try {
     const { searchParams } = new URL(req.url)
     const admin = searchParams.get('admin')
@@ -25,11 +24,16 @@ export async function GET(req: NextRequest) {
     })
 
     if (admin !== 'true') {
-      return NextResponse.json(
-        products.filter((p) => p.status === 'ACTIVE')
-      )
+      // [PERBAIKAN] Jangan filter produk, hanya filter varian
+      const allProductsForPublic = products.map((p) => ({
+        ...p,
+        // Kita tetap filter varian yang INACTIVE agar tidak muncul di halaman detail
+        variants: p.variants.filter((v) => v.status === "ACTIVE"),
+      }));
+      return NextResponse.json(allProductsForPublic);
     }
 
+    // Admin mendapatkan semua data
     return NextResponse.json(products)
   } catch (error: any) { // Tambahkan 'any'
     console.error('💥 GET /api/products FAILED:', error); // <-- TAMBAHKAN INI
@@ -80,6 +84,7 @@ export async function POST(req: NextRequest) {
           value: v.value,
           stock: parseInt(String(v.stock)) || 0,
           price: v.price ? parseFloat(String(v.price)) : null, // <-- TAMBAHKAN INI
+          status: v.status || "ACTIVE",
         })),
       })
     }

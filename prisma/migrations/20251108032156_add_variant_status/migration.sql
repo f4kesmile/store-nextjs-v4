@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE `variants` ADD COLUMN `status` ENUM('ACTIVE', 'INACTIVE') NOT NULL DEFAULT 'ACTIVE';

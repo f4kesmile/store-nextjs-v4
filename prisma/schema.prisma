@@ -60,6 +60,7 @@ model Variant {
     value       String // e.g., "XL", "Red"
     stock       Int           @default(0)
     price       Decimal?      @db.Decimal(10, 2)
+    status      Status        @default(ACTIVE)
     createdAt   DateTime      @default(now()) @map("created_at")
     updatedAt   DateTime      @updatedAt @map("updated_at")
     Transaction Transaction[]

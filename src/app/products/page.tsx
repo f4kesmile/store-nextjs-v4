@@ -25,14 +25,17 @@ import {
   Filter,
   Package,
   Loader2,
-} from "lucide-react"; // Tambah ikon
+} from "lucide-react";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils"; // [PERBAIKAN] Pastikan 'cn' di-impor
 
+// ... (Interface dan formatRupiah tetap sama) ...
 interface Variant {
   id: number;
   name: string;
   value: string;
   stock: number;
+  status: "ACTIVE" | "INACTIVE";
 }
 interface ProductImage {
   id: number;
@@ -45,7 +48,7 @@ interface Product {
   iconUrl: string;
   price: number;
   stock: number;
-  status: string;
+  status: "ACTIVE" | "INACTIVE"; // Pastikan status ada di interface
   enableNotes: boolean;
   variants: Variant[];
   images: ProductImage[];
@@ -73,6 +76,7 @@ function ProductsContent() {
   useEffect(() => {
     (async () => {
       try {
+        // API sekarang mengembalikan SEMUA produk (aktif dan non-aktif)
         const res = await fetch("/api/products");
         const data = await res.json();
         setProducts(data);
@@ -86,7 +90,9 @@ function ProductsContent() {
   }, []);
 
   const filtered = useMemo(() => {
-    let list = products.filter((p) => p.status === "ACTIVE");
+    // [PERBAIKAN] Hapus filter status dari sini
+    let list = [...products]; // Salin array untuk sorting
+
     if (query.trim()) {
       const q = query.toLowerCase();
       list = list.filter(
@@ -95,11 +101,9 @@ function ProductsContent() {
           (p.description && p.description.toLowerCase().includes(q))
       );
     }
-    if (sort === "price_asc")
-      list = [...list].sort((a, b) => a.price - b.price);
-    if (sort === "price_desc")
-      list = [...list].sort((a, b) => b.price - a.price);
-    // Default 'new' uses original order from API (usually desc by createdAt)
+    if (sort === "price_asc") list = list.sort((a, b) => a.price - b.price);
+    if (sort === "price_desc") list = list.sort((a, b) => b.price - a.price);
+
     return list;
   }, [products, query, sort]);
 
@@ -110,7 +114,7 @@ function ProductsContent() {
       <SiteNavbar />
 
       <section className="container mx-auto px-4 pt-6 pb-4">
-        {/* Header Responsif */}
+        {/* ... (Header dan Filter Bar tetap sama) ... */}
         <div className="flex flex-col md:flex-row gap-4 md:items-center md:justify-between mb-6">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold tracking-tight flex items-center gap-2">
@@ -122,8 +126,6 @@ function ProductsContent() {
             </p>
           </div>
         </div>
-
-        {/* Filter Bar Responsif */}
         <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center bg-muted/30 p-3 rounded-lg border">
           <div className="relative flex-1">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -152,7 +154,7 @@ function ProductsContent() {
 
       <section className="container mx-auto px-4 py-8">
         {loading ? (
-          // Loading Skeletons Responsive Grid
+          // ... (Loading Skeletons tetap sama) ...
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {Array.from({ length: 8 }).map((_, i) => (
               <div key={i} className="border rounded-xl p-4 space-y-4">
@@ -167,6 +169,7 @@ function ProductsContent() {
             ))}
           </div>
         ) : filtered.length === 0 ? (
+          // ... (Tampilan "Tidak ada produk" tetap sama) ...
           <div className="text-center py-16">
             <Search className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
             <h3 className="text-lg font-semibold">
@@ -180,41 +183,63 @@ function ProductsContent() {
           // Product Grid Responsif
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {filtered.map((product) => {
-              const activeStock = product.stock; // Simplifikasi untuk tampilan grid, detail lebih akurat
-              // Cek apakah ada varian yang punya stok jika stok utama 0
-              const hasAnyVariantStock = product.variants.some(
-                (v) => v.stock > 0
+              // [PERBAIKAN] Logika 'isUnavailable' yang baru
+              const activeVariants = product.variants.filter(
+                (v) => v.status === "ACTIVE"
               );
-              const isTrulyOutOfStock = activeStock <= 0 && !hasAnyVariantStock;
+              const hasActiveVariants = activeVariants.length > 0;
+
+              let isUnavailable = false;
+              let statusText = "Stok Habis"; // Default text
+
+              if (product.status === "INACTIVE") {
+                isUnavailable = true;
+                statusText = "Tidak Tersedia";
+              } else if (hasActiveVariants) {
+                // Produk Aktif, cek stok varian
+                const totalVariantStock = activeVariants.reduce(
+                  (sum, v) => sum + v.stock,
+                  0
+                );
+                isUnavailable = totalVariantStock <= 0;
+              } else {
+                // Produk Aktif, tidak punya varian, cek stok utama
+                isUnavailable = product.stock <= 0;
+              }
+              // Selesai Logika 'isUnavailable'
 
               return (
                 <Card
                   key={product.id}
-                  className={`flex flex-col h-full overflow-hidden transition-all duration-200 hover:shadow-md ${
-                    isTrulyOutOfStock ? "opacity-70" : ""
-                  }`}
+                  className={cn(
+                    "flex flex-col h-full overflow-hidden transition-all duration-200 hover:shadow-md",
+                    // [PERBAIKAN] Terapkan style abu-abu & non-interaktif
+                    isUnavailable && "opacity-60 grayscale pointer-events-none"
+                  )}
                 >
                   {/* Gambar Produk */}
                   <div
                     className="relative aspect-square bg-muted/30 flex items-center justify-center overflow-hidden cursor-pointer border-b"
-                    onClick={() => openProduct(product.id)}
+                    // [PERBAIKAN] Hapus onClick, biarkan tombol "Detail"
                   >
                     {product.iconUrl ? (
                       <img
                         src={product.iconUrl}
                         alt={product.name}
-                        className="w-full h-full object-cover transition-transform duration-500 hover:scale-105"
+                        className="w-full h-full object-contain p-4 transition-transform duration-500 hover:scale-105"
                       />
                     ) : (
                       <Info className="h-16 w-16 text-muted-foreground/30" />
                     )}
-                    {isTrulyOutOfStock && (
+
+                    {/* [PERBAIKAN] Gunakan logika 'isUnavailable' baru */}
+                    {isUnavailable && (
                       <div className="absolute inset-0 bg-background/60 flex items-center justify-center">
                         <Badge
                           variant="destructive"
                           className="text-sm px-3 py-1"
                         >
-                          Stok Habis
+                          {statusText}
                         </Badge>
                       </div>
                     )}
@@ -222,17 +247,15 @@ function ProductsContent() {
 
                   <CardContent className="flex-1 p-4 flex flex-col">
                     <div
-                      onClick={() => openProduct(product.id)}
+                      // [PERBAIKAN] Hapus onClick, biarkan tombol "Detail"
                       className="cursor-pointer flex-1"
                     >
                       <h3 className="font-semibold leading-tight line-clamp-2 mb-2 hover:text-primary transition-colors">
                         {product.name}
                       </h3>
-                      {/* Tampilkan sedikit deskripsi jika ada */}
                       {product.description && (
                         <p className="text-sm text-muted-foreground line-clamp-2 mb-4">
-                          {product.description.replace(/[#*`_]/g, "")}{" "}
-                          {/* Strip markdown dasar */}
+                          {product.description.replace(/[#*`_]/g, "")}
                         </p>
                       )}
                     </div>
@@ -260,15 +283,19 @@ function ProductsContent() {
                       variant="outline"
                       className="flex-1"
                       onClick={() => openProduct(product.id)}
+                      // [PERBAIKAN] Tombol detail tetap aktif agar user bisa lihat
+                      // Tapi jika Anda ingin mematikannya juga, hapus komentar di bawah
+                      // disabled={isUnavailable}
                     >
                       Detail
                     </Button>
                     <Button
                       className="flex-1"
-                      disabled={isTrulyOutOfStock}
+                      // [PERBAIKAN] Selalu disable jika tidak tersedia
+                      disabled={isUnavailable}
                       onClick={() => {
-                        if (isTrulyOutOfStock) return;
-                        // Jika punya varian, harus ke detail dulu
+                        // (Logika add to cart tetap sama)
+                        if (isUnavailable) return;
                         if (product.variants.length > 0) {
                           openProduct(product.id);
                           toast.info("Pilih varian di halaman detail");

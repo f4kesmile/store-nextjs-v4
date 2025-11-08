@@ -25,13 +25,13 @@ import {
   Package,
   Plus,
   Package2,
-  Image as ImageIcon,
+  ImageIcon,
   Loader2,
   Upload,
   X,
   Trash2,
   Database,
-  DollarSign, // <-- IMPORT BARU
+  DollarSign,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -45,7 +45,8 @@ interface Variant {
   name: string;
   value: string;
   stock: number;
-  price?: number | null; // <-- TAMBAHKAN HARGA
+  price?: number | null;
+  status?: "ACTIVE" | "INACTIVE"; // [FITUR] Tambah status
 }
 interface ProductImage {
   id: number;
@@ -103,6 +104,7 @@ const ProductsPage: React.FC = () => {
           variants: p.variants.map((v: any) => ({
             ...v,
             price: v.price ? parseFloat(v.price) : null,
+            status: v.status || "ACTIVE", // [FITUR] Pastikan status ada
           })),
         }));
         setProducts(formattedData);
@@ -142,6 +144,7 @@ const ProductsPage: React.FC = () => {
       variants: product.variants.map((v) => ({
         ...v,
         price: v.price ? Number(v.price) : null, // Pastikan adalah number
+        status: v.status || "ACTIVE", // [FITUR] Pastikan status ada
       })),
     });
     setIsDialogOpen(true);
@@ -180,6 +183,7 @@ const ProductsPage: React.FC = () => {
       ...v,
       price: v.price ? parseFloat(String(v.price)) : null,
       stock: parseInt(String(v.stock)) || 0,
+      status: v.status || "ACTIVE", // [FITUR] Sertakan status
     }));
 
     const mainPayload = {
@@ -208,6 +212,8 @@ const ProductsPage: React.FC = () => {
 
       const savedProduct = await res.json();
 
+      // [FIX] Logika update varian HARUS dijalankan juga saat !isCreateMode
+      // Ini adalah bagian dari perbaikan Bug #1
       if (!isCreateMode) {
         const variantRes = await fetch(
           `/api/products/${savedProduct.id}/variants`,
@@ -267,7 +273,13 @@ const ProductsPage: React.FC = () => {
       ...prev,
       variants: [
         ...(prev?.variants || []),
-        { name: "Ukuran", value: "Default", stock: 0, price: null }, // <-- Tambah harga
+        {
+          name: "Ukuran",
+          value: "Default",
+          stock: 0,
+          price: null,
+          status: "ACTIVE",
+        }, // [FITUR] Tambah status
       ],
     }));
   };
@@ -421,10 +433,9 @@ const ProductsPage: React.FC = () => {
       label: "Stok",
       render: (v: number, product: Product) => {
         if (product.variants && product.variants.length > 0) {
-          const totalVariantStock = product.variants.reduce(
-            (acc, v) => acc + v.stock,
-            0
-          );
+          const totalVariantStock = product.variants
+            .filter((v) => v.status === "ACTIVE") // [FITUR] Hanya hitung stok aktif
+            .reduce((acc, v) => acc + v.stock, 0);
           return (
             <div className="flex items-center gap-2">
               <Database className="w-4 h-4 text-muted-foreground" />
@@ -711,7 +722,7 @@ const ProductsPage: React.FC = () => {
                   </div>
                   {/* ------------------------------------------- */}
                   <div className="space-y-2">
-                    <Label>Status</Label>
+                    <Label>Status Produk</Label>
                     <Select
                       value={selectedProduct.status || "ACTIVE"}
                       onValueChange={(v) => handleDialogChange("status", v)}
@@ -754,7 +765,7 @@ const ProductsPage: React.FC = () => {
                     <div className="space-y-1">
                       <Label className="text-base">Daftar Varian</Label>
                       <p className="text-sm text-muted-foreground">
-                        Kelola stok dan harga untuk tiap varian.
+                        Kelola stok, harga, dan status untuk tiap varian.
                       </p>
                     </div>
                     <Button
@@ -775,6 +786,7 @@ const ProductsPage: React.FC = () => {
                     </div>
                   ) : (
                     <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
+                      {/* [FITUR] Mengubah grid layout untuk menambah status */}
                       {selectedProduct.variants?.map((variant, index) => (
                         <div
                           key={index}
@@ -812,13 +824,12 @@ const ProductsPage: React.FC = () => {
                               disabled={isBusy}
                             />
                           </div>
-                          {/* --- INPUT HARGA VARIAN --- */}
-                          <div className="col-span-3 space-y-1">
+                          <div className="col-span-2 space-y-1">
                             <Label htmlFor={`v-price-${index}`}>Harga</Label>
                             <Input
                               id={`v-price-${index}`}
                               type="number"
-                              placeholder="Kosong = harga utama"
+                              placeholder="Kosong"
                               value={variant.price ?? ""}
                               onChange={(e) =>
                                 handleVariantChange(
@@ -830,7 +841,6 @@ const ProductsPage: React.FC = () => {
                               disabled={isBusy}
                             />
                           </div>
-                          {/* --------------------------- */}
                           <div className="col-span-2 space-y-1">
                             <Label htmlFor={`v-stock-${index}`}>Stok</Label>
                             <Input
@@ -848,12 +858,36 @@ const ProductsPage: React.FC = () => {
                               disabled={isBusy}
                             />
                           </div>
+                          {/* [FITUR] Input Status Varian */}
                           <div className="col-span-1">
+                            <Label htmlFor={`v-status-${index}`}>Status</Label>
+                            <Select
+                              value={variant.status || "ACTIVE"}
+                              onValueChange={(v) =>
+                                handleVariantChange(index, "status", v)
+                              }
+                              disabled={isBusy}
+                            >
+                              <SelectTrigger
+                                id={`v-status-${index}`}
+                                className="w-full"
+                              >
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="ACTIVE">On</SelectItem>
+                                <SelectItem value="INACTIVE">Off</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          {/* --------------------------- */}
+                          <div className="col-span-1">
+                            <Label>&nbsp;</Label>
                             <Button
                               type="button"
                               variant="ghost"
                               size="icon"
-                              className="text-destructive"
+                              className="text-destructive w-full"
                               onClick={() => removeVariant(index)}
                               disabled={isBusy}
                             >

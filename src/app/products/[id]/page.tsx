@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+// [FIX 1/2] Impor 'useMemo' dari React
+import { useEffect, useState, Suspense, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useCart } from "@/contexts/CartContext";
 import { toast } from "sonner";
@@ -34,6 +35,7 @@ interface Variant {
   value: string;
   stock: number;
   price?: number | null; // <-- TAMBAHKAN HARGA
+  status: "ACTIVE" | "INACTIVE"; // [FITUR] Tambah status
 }
 interface ProductImage {
   id: number;
@@ -46,7 +48,7 @@ interface Product {
   iconUrl: string;
   price: number;
   stock: number;
-  status: string;
+  status: "ACTIVE" | "INACTIVE"; // [FITUR] Tambah status
   enableNotes: boolean;
   variants: Variant[];
   images: ProductImage[];
@@ -75,6 +77,11 @@ function ProductDetailContent() {
   const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
   const [loadingRelated, setLoadingRelated] = useState(true);
 
+  // [FITUR] Pisahkan varian yang aktif
+  const availableVariants = useMemo(() => {
+    return product?.variants.filter((v) => v.status === "ACTIVE") || [];
+  }, [product]);
+
   useEffect(() => {
     if (id) {
       (async () => {
@@ -83,20 +90,35 @@ function ProductDetailContent() {
           const res = await fetch(`/api/products/${id}`);
           if (!res.ok) throw new Error("Produk tidak ditemukan");
           const data = await res.json();
+
+          // [FITUR] Cek status produk utama
+          if (data.status !== "ACTIVE") {
+            throw new Error("Produk ini sedang tidak tersedia");
+          }
+
           // Konversi harga varian
           data.variants = data.variants.map((v: any) => ({
             ...v,
             price: v.price ? parseFloat(v.price) : null,
+            status: v.status || "ACTIVE", // Pastikan status ada
           }));
+
           setProduct(data);
           setMainImage(data.iconUrl || data.images?.[0]?.url || "");
-          if (data.variants?.length > 0)
-            setSelectedVariant(
-              data.variants.find((v: Variant) => v.stock > 0) ||
-                data.variants[0]
+
+          // [FITUR] Logika pemilihan varian default diubah
+          if (data.variants?.length > 0) {
+            const activeVariants = data.variants.filter(
+              (v: Variant) => v.status === "ACTIVE"
             );
-        } catch (error) {
-          toast.error("Produk tidak ditemukan");
+            setSelectedVariant(
+              activeVariants.find((v: Variant) => v.stock > 0) ||
+                activeVariants[0] || // Fallback ke varian aktif pertama walau stok 0
+                null // Jika tidak ada varian aktif
+            );
+          }
+        } catch (error: any) {
+          toast.error(error.message || "Produk tidak ditemukan");
           router.push("/products");
         } finally {
           setLoading(false);
@@ -137,20 +159,55 @@ function ProductDetailContent() {
     (selectedVariant?.price != null // Cek jika 0 atau null/undefined
       ? selectedVariant.price
       : product?.price) || 0;
-  const hasStock = activeStock > 0;
+
+  // [FITUR] Cek stok dan status
+  const hasVariants = (product?.variants?.length || 0) > 0;
+  const hasActiveVariants = availableVariants.length > 0;
+
+  // Logika "bisa dibeli"
+  const isPurchasable = () => {
+    if (product?.status !== "ACTIVE") return false; // Produk utama non-aktif
+    if (hasVariants) {
+      // Jika punya varian, setidaknya 1 varian harus aktif
+      if (!hasActiveVariants) return false;
+      // Varian yang dipilih harus ada, aktif, dan punya stok
+      return (
+        selectedVariant &&
+        selectedVariant.status === "ACTIVE" &&
+        selectedVariant.stock > 0
+      );
+    }
+    // Jika tidak punya varian, stok produk utama harus ada
+    return (product?.stock || 0) > 0;
+  };
+
+  const hasStock = isPurchasable();
+
+  // Menentukan total stok yang relevan untuk Badge
+  // [FIX 2/2] Tambahkan tipe eksplisit 'number' dan 'Variant' pada parameter reduce
+  const displayStock = hasVariants
+    ? availableVariants.reduce((sum: number, v: Variant) => sum + v.stock, 0) // Total stok dari varian aktif
+    : product?.stock || 0;
   // ----------------------------------------
 
   const handleAddToCart = () => {
     if (!product) return;
+
+    // [FITUR] Validasi yang disempurnakan
     if (product.variants.length > 0 && !selectedVariant) {
-      toast.error("Pilih varian dulu.");
+      toast.error("Pilih varian yang tersedia dulu.");
       return;
     }
-    if (activeStock < quantity) {
-      toast.error("Stok kurang.");
+    if (selectedVariant && selectedVariant.status !== "ACTIVE") {
+      toast.error("Varian yang dipilih tidak tersedia.");
+      return;
+    }
+    if (!hasStock || activeStock < quantity) {
+      toast.error("Stok tidak mencukupi.");
       setQuantity(activeStock || 1);
       return;
     }
+
     addToCart({
       productId: product.id,
       productName: product.name,
@@ -171,9 +228,10 @@ function ProductDetailContent() {
     return (
       <div className="container mx-auto px-4 py-8">
         <Skeleton className="h-8 w-32 mb-8" />
-        <div className="grid lg:grid-cols-2 gap-10">
-          <Skeleton className="aspect-square w-full rounded-xl" />
-          <div className="space-y-6">
+        {/* [PERBAIKAN] Ubah grid jadi 5 kolom */}
+        <div className="grid lg:grid-cols-5 gap-10">
+          <Skeleton className="aspect-square w-full rounded-xl lg:col-span-2" />
+          <div className="space-y-6 lg:col-span-3">
             <Skeleton className="h-12 w-3/4" />
             <Skeleton className="h-8 w-1/2" />
             <Skeleton className="h-24 w-full" />
@@ -206,9 +264,10 @@ function ProductDetailContent() {
         </Button>
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-10 lg:gap-16">
-        {/* ... (Galeri Gambar tetap sama) ... */}
-        <div className="space-y-4">
+      {/* [PERBAIKAN] Ubah grid jadi 5 kolom */}
+      <div className="grid lg:grid-cols-5 gap-10 lg:gap-16">
+        {/* [PERBAIKAN] Beri gambar 2 kolom */}
+        <div className="space-y-4 lg:col-span-2">
           <Dialog>
             <DialogTrigger asChild>
               <div className="relative aspect-square bg-muted/30 dark:bg-muted/10 rounded-2xl overflow-hidden cursor-zoom-in border shadow-sm flex items-center justify-center group">
@@ -258,7 +317,8 @@ function ProductDetailContent() {
           )}
         </div>
 
-        <div className="flex flex-col h-full">
+        {/* [PERBAIKAN] Beri detail 3 kolom */}
+        <div className="flex flex-col h-full lg:col-span-3">
           <div>
             <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight">
               {product.name}
@@ -269,12 +329,13 @@ function ProductDetailContent() {
                 {formatRupiah(activePrice)}
               </span>
               {/* ------------------------------- */}
-              {hasStock ? (
+              {/* [FITUR] Tampilan stok diperbarui */}
+              {displayStock > 0 ? (
                 <Badge
                   variant="outline"
                   className="text-green-600 border-green-200 bg-green-50 dark:bg-green-950/30 dark:border-green-900 px-3 py-1"
                 >
-                  Stok Tersedia: {activeStock}
+                  Stok Tersedia: {displayStock}
                 </Badge>
               ) : (
                 <Badge variant="destructive" className="px-3 py-1">
@@ -294,35 +355,59 @@ function ProductDetailContent() {
           </div>
 
           <div className="space-y-6 mt-8">
+            {/* [FITUR] Logic render varian diubah */}
             {product.variants.length > 0 && (
               <div className="space-y-3">
                 <Label className="text-base font-semibold">Pilih Varian</Label>
-                <div className="flex flex-wrap gap-2">
-                  {product.variants.map((v) => (
-                    <Button
-                      key={v.id}
-                      variant={
-                        selectedVariant?.id === v.id ? "default" : "outline"
-                      }
-                      onClick={() => setSelectedVariant(v)}
-                      disabled={v.stock === 0}
-                      className={cn("h-9", v.stock === 0 && "opacity-50")}
-                    >
-                      {v.value}
-                      {/* Tampilkan harga varian jika ada & berbeda */}
-                      {v.price != null && v.price !== product.price && (
-                        <span className="ml-2 text-xs opacity-80">
-                          ({formatRupiah(v.price)})
-                        </span>
-                      )}
-                    </Button>
-                  ))}
-                </div>
+                {availableVariants.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    Semua varian untuk produk ini sedang tidak tersedia.
+                  </p>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {product.variants.map((v) => {
+                      // Cek status dan stok
+                      const isAvailable = v.status === "ACTIVE";
+                      const hasStock = v.stock > 0;
+                      const isDisabled = !isAvailable || !hasStock;
+
+                      return (
+                        <Button
+                          key={v.id}
+                          variant={
+                            selectedVariant?.id === v.id ? "default" : "outline"
+                          }
+                          onClick={() => setSelectedVariant(v)}
+                          disabled={isDisabled} // Nonaktifkan jika tidak aktif ATAU stok 0
+                          className={cn(
+                            "h-9 relative",
+                            isDisabled && "opacity-50 line-through" // Tambahkan coretan
+                          )}
+                          title={
+                            !isAvailable
+                              ? "Varian non-aktif"
+                              : !hasStock
+                              ? "Stok habis"
+                              : ""
+                          }
+                        >
+                          {v.value}
+                          {/* Tampilkan harga varian jika ada & berbeda */}
+                          {v.price != null && v.price !== product.price && (
+                            <span className="ml-2 text-xs opacity-80">
+                              ({formatRupiah(v.price)})
+                            </span>
+                          )}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
 
-            {/* ... (Tombol Kuantitas & Beli tetap sama) ... */}
-            {hasStock && (
+            {/* [FITUR] Tombol Kuantitas & Beli hanya muncul jika bisa dibeli */}
+            {displayStock > 0 ? (
               <div className="space-y-4 p-4 bg-muted/30 rounded-xl border">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium">Jumlah Pembelian</span>
@@ -331,7 +416,7 @@ function ProductDetailContent() {
                       variant="ghost"
                       size="icon"
                       onClick={() => setQuantity((q) => Math.max(1, q - 1))}
-                      disabled={quantity <= 1}
+                      disabled={quantity <= 1 || !hasStock}
                       className="h-9 w-9 rounded-none px-0"
                     >
                       <Minus className="h-3.5 w-3.5" />
@@ -348,6 +433,7 @@ function ProductDetailContent() {
                           )
                         )
                       }
+                      disabled={!hasStock}
                     />
                     <Button
                       variant="ghost"
@@ -355,7 +441,7 @@ function ProductDetailContent() {
                       onClick={() =>
                         setQuantity((q) => Math.min(activeStock, q + 1))
                       }
-                      disabled={quantity >= activeStock}
+                      disabled={quantity >= activeStock || !hasStock}
                       className="h-9 w-9 rounded-none px-0"
                     >
                       <Plus className="h-3.5 w-3.5" />
@@ -367,6 +453,7 @@ function ProductDetailContent() {
                     size="lg"
                     className="text-base font-semibold shadow-md"
                     onClick={handleAddToCart}
+                    disabled={!hasStock} // Nonaktifkan jika tidak bisa dibeli
                   >
                     <ShoppingCart className="mr-2 h-5 w-5" /> + Keranjang
                   </Button>
@@ -375,14 +462,22 @@ function ProductDetailContent() {
                     variant="secondary"
                     className="text-base font-semibold bg-primary/10 text-primary hover:bg-primary/20 border-primary/20 border"
                     onClick={() => {
+                      if (!hasStock) return;
                       handleAddToCart();
                       router.push("/checkout");
                     }}
+                    disabled={!hasStock} // Nonaktifkan jika tidak bisa dibeli
                   >
                     Beli Sekarang <Zap className="ml-2 h-5 w-5" />
                   </Button>
                 </div>
               </div>
+            ) : (
+              <Card className="p-4 border-destructive bg-destructive/5">
+                <p className="text-center font-medium text-destructive-foreground">
+                  Produk ini sedang tidak tersedia.
+                </p>
+              </Card>
             )}
           </div>
         </div>
