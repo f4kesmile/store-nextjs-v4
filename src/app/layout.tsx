@@ -8,7 +8,6 @@ import { getServerSettings } from "@/lib/server-settings";
 import HeadFavicon from "@/components/HeadFavicon";
 import { Toaster } from "sonner";
 import { Suspense } from "react";
-// (1) Impor kursor kustom kita
 import { InteractiveCursor } from "@/components/InteractiveCursor";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -32,7 +31,6 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    // (2) Tambahkan 'cursor-none' untuk menyembunyikan kursor sistem
     <html lang="id" className="cursor-none">
       <body>
         <Suspense fallback={null}>
@@ -40,9 +38,8 @@ export default function RootLayout({
             <HeadFavicon />
             <ResellerProvider>
               <CartProvider>
-                {/* (3) Tambahkan kursor di sini */}
                 <InteractiveCursor />
-                {children}
+                <main className="pb-32">{children}</main>
                 <Toaster richColors position="top-right" visibleToasts={3} />
               </CartProvider>
             </ResellerProvider>

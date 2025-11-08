@@ -1,121 +1,105 @@
+// src/components/site-navbar.tsx
 "use client";
 
+import { useSession, signOut } from "next-auth/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useCart } from "@/contexts/CartContext";
 import {
-  ShoppingCart,
-  User,
-  Search,
-  Menu,
   Home,
   Package,
   Phone,
+  ShoppingCart,
+  LogIn,
+  LogOut,
+  LayoutDashboard,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-// PERBAIKAN 1: Tambahkan import SheetHeader dan SheetTitle
-import {
-  Sheet,
-  SheetContent,
-  SheetTrigger,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-import { useEffect, useState } from "react";
-import { useCart } from "@/contexts/CartContext";
+import { cn } from "@/lib/utils";
 
-const nav = [
-  { href: "/", label: "Home", icon: Home },
-  { href: "/products", label: "Products", icon: Package },
-  { href: "/contact", label: "Contact", icon: Phone },
-];
+import { FloatingDock } from "@/components/ui/floating-dock";
+
+interface DockItem {
+  title: string;
+  icon: React.ReactNode;
+  href: string;
+  onClick?: () => void;
+}
 
 export function SiteNavbar() {
+  const { data: session } = useSession();
   const pathname = usePathname();
-  const [open, setOpen] = useState(false);
   const { getCartCount } = useCart();
-  const [count, setCount] = useState(0);
-  useEffect(() => {
-    setCount(getCartCount());
-  }, [getCartCount]);
+  const cartCount = getCartCount();
+
+  const baseLinks = [
+    { name: "Home", href: "/", icon: Home },
+    { name: "Products", href: "/products", icon: Package },
+    { name: "Contact", href: "/contact", icon: Phone },
+  ];
+
+  const dockItems: DockItem[] = baseLinks.map((link) => ({
+    title: link.name,
+    href: link.href,
+    icon: (
+      <link.icon
+        className={cn(
+          "h-full w-full",
+          pathname === link.href
+            ? "text-primary"
+            : "text-neutral-500 dark:text-neutral-300"
+        )}
+      />
+    ),
+  }));
+
+  dockItems.push({
+    title: `Keranjang (${cartCount})`,
+    href: "/cart",
+    icon: (
+      <div className="relative h-full w-full">
+        <ShoppingCart
+          className={cn(
+            "h-full w-full",
+            pathname === "/cart"
+              ? "text-primary"
+              : "text-neutral-500 dark:text-neutral-300"
+          )}
+        />
+        {cartCount > 0 && (
+          <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+            {cartCount}
+          </span>
+        )}
+      </div>
+    ),
+  });
+
+  if (session) {
+    dockItems.push({
+      title: "Admin",
+      href: "/admin",
+      icon: (
+        <LayoutDashboard className="h-full w-full text-neutral-500 dark:text-neutral-300" />
+      ),
+    });
+  } else {
+    dockItems.push({
+      title: "Login",
+      href: "/login",
+      icon: (
+        <LogIn className="h-full w-full text-neutral-500 dark:text-neutral-300" />
+      ),
+    });
+  }
+
+  if (pathname === "/login") {
+    return null;
+  }
 
   return (
-    <nav className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-14 items-center">
-        <div className="flex items-center gap-2">
-          <Link href="/" className="font-bold">
-            Devlog Store
-          </Link>
-        </div>
-
-        <div className="ml-6 hidden md:flex items-center gap-1">
-          {nav.map(({ href, label, icon: Icon }) => (
-            <Link
-              key={href}
-              href={href}
-              className={`inline-flex items-center gap-2 px-3 py-2 rounded-md text-sm hover:text-primary ${
-                pathname === href
-                  ? "text-primary bg-primary/5"
-                  : "text-muted-foreground"
-              }`}
-            >
-              <Icon className="h-4 w-4" /> {label}
-            </Link>
-          ))}
-        </div>
-
-        <div className="ml-auto flex items-center gap-1">
-          <Button variant="ghost" size="icon" aria-label="Search">
-            <Search className="h-5 w-5" />
-          </Button>
-          <Link href="/cart" className="relative p-2">
-            <ShoppingCart className="h-5 w-5" />
-            {count > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-primary text-primary-foreground text-[10px] px-1 font-medium">
-                {count}
-              </span>
-            )}
-          </Link>
-          <Link href="/admin" className="p-2">
-            <User className="h-5 w-5" />
-          </Link>
-
-          <Sheet open={open} onOpenChange={setOpen}>
-            <SheetTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="md:hidden"
-                aria-label="Menu"
-              >
-                <Menu className="h-5 w-5" />
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="left" className="w-72">
-              {/* PERBAIKAN 2: Gunakan SheetHeader & SheetTitle standar, hapus tombol X manual */}
-              <SheetHeader className="text-left px-2">
-                <SheetTitle>Menu</SheetTitle>
-              </SheetHeader>
-
-              <div className="grid gap-1 mt-4">
-                {nav.map(({ href, label, icon: Icon }) => (
-                  <Link
-                    key={href}
-                    href={href}
-                    onClick={() => setOpen(false)}
-                    className={`inline-flex items-center gap-2 px-3 py-2 rounded-md hover:bg-muted ${
-                      pathname === href
-                        ? "text-primary bg-primary/5 font-medium"
-                        : ""
-                    }`}
-                  >
-                    <Icon className="h-4 w-4" /> {label}
-                  </Link>
-                ))}
-              </div>
-            </SheetContent>
-          </Sheet>
-        </div>
-      </div>
-    </nav>
+    <div className="fixed bottom-10 inset-x-0 w-full z-50 flex justify-center">
+      <FloatingDock items={dockItems} />{" "}
+      {/* Tidak perlu lagi desktopClassName/mobileClassName */}
+    </div>
   );
 }
