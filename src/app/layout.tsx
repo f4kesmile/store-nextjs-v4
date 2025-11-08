@@ -1,3 +1,4 @@
+// src/app/layout.tsx
 import type { Metadata } from "next";
 import "./globals.css";
 import { Providers } from "./providers";
@@ -6,7 +7,9 @@ import { ResellerProvider } from "@/contexts/ResellerContext";
 import { getServerSettings } from "@/lib/server-settings";
 import HeadFavicon from "@/components/HeadFavicon";
 import { Toaster } from "sonner";
-import { Suspense } from "react"; // <-- Import Suspense
+import { Suspense } from "react";
+// (1) Impor kursor kustom kita
+import { InteractiveCursor } from "@/components/InteractiveCursor";
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await getServerSettings();
@@ -29,14 +32,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="id">
+    // (2) Tambahkan 'cursor-none' untuk menyembunyikan kursor sistem
+    <html lang="id" className="cursor-none">
       <body>
-        {/* FIX: Bungkus Providers di Suspense untuk mengatasi useSearchParams di SSR/SSG */}
         <Suspense fallback={null}>
           <Providers>
             <HeadFavicon />
             <ResellerProvider>
               <CartProvider>
+                {/* (3) Tambahkan kursor di sini */}
+                <InteractiveCursor />
                 {children}
                 <Toaster richColors position="top-right" visibleToasts={3} />
               </CartProvider>
