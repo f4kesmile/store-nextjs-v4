@@ -10,7 +10,9 @@ import AdminTable from "@/components/admin/shared/AdminTable";
 import {
   ActionDropdown,
   createCommonActions,
+  FormGrid, // [FIX] Import FormGrid
 } from "@/components/admin/shared/AdminComponents";
+import AdminDialog from "@/components/admin/shared/AdminDialog"; // [FIX] Import AdminDialog
 import {
   Select,
   SelectContent,
@@ -22,8 +24,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import TransactionExportButton from "@/components/TransactionExportButton";
 import { Download, Plus } from "lucide-react";
-import { Card } from "@/components/ui/card"; // [MODIFIKASI] Import Card
-import { Skeleton } from "@/components/ui/skeleton"; // [MODIFIKASI] Import Skeleton
+import { Card } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 
 // Tipe data berdasarkan Prisma schema Anda
 interface Transaction {
@@ -284,7 +286,7 @@ export default function TransactionsPage() {
           title="Semua Transaksi"
           description={`${filteredTransactions.length} transaksi ditemukan`}
         >
-          {/* [MODIFIKASI] Tampilan Tabel Desktop */}
+          {/* Tampilan Tabel Desktop */}
           <div className="hidden md:block">
             <AdminTable
               columns={columns}
@@ -313,7 +315,7 @@ export default function TransactionsPage() {
             />
           </div>
 
-          {/* [MODIFIKASI] Tampilan Card Mobile */}
+          {/* Tampilan Card Mobile */}
           <div className="block md:hidden">
             <div className="flex gap-2 mb-4">
               <Input
@@ -412,87 +414,95 @@ export default function TransactionsPage() {
           </div>
         </AdminCard>
 
-        {/* Modal Edit (Tidak berubah) */}
-        {showModal && editingTransaction && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-xl max-w-md w-full p-6">
-              <h2 className="text-2xl font-bold mb-6">
-                Edit Transaksi #{editingTransaction.id}
-              </h2>
-              <form onSubmit={handleUpdateTransaction} className="space-y-4">
-                <div>
-                  <Label htmlFor="status">Status</Label>
-                  <Select
-                    value={formData.status}
-                    onValueChange={(v) =>
-                      setFormData((f) => ({
-                        ...f,
-                        status: v as Transaction["status"],
-                      }))
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Pilih status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="PENDING">Pending</SelectItem>
-                      <SelectItem value="CONFIRMED">Confirmed</SelectItem>
-                      <SelectItem value="SHIPPED">Shipped</SelectItem>
-                      <SelectItem value="COMPLETED">Completed</SelectItem>
-                      <SelectItem value="CANCELLED">Cancelled</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="customerName">Nama Customer</Label>
-                  <Input
-                    id="customerName"
-                    value={formData.customerName}
-                    onChange={(e) =>
-                      setFormData((f) => ({
-                        ...f,
-                        customerName: e.target.value,
-                      }))
-                    }
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="customerPhone">Telepon Customer</Label>
-                  <Input
-                    id="customerPhone"
-                    value={formData.customerPhone}
-                    onChange={(e) =>
-                      setFormData((f) => ({
-                        ...f,
-                        customerPhone: e.target.value,
-                      }))
-                    }
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="notes">Catatan Admin</Label>
-                  <Textarea
-                    id="notes"
-                    value={formData.notes}
-                    onChange={(e) =>
-                      setFormData((f) => ({ ...f, notes: e.target.value }))
-                    }
-                  />
-                </div>
-                <div className="flex justify-end gap-3 pt-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setShowModal(false)}
-                  >
-                    Batal
-                  </Button>
-                  <Button type="submit">Simpan</Button>
-                </div>
-              </form>
+        {/* [FIX] Mengganti modal manual dengan AdminDialog */}
+        <AdminDialog
+          open={showModal}
+          onOpenChange={setShowModal}
+          title={`Edit Transaksi #${editingTransaction?.id}`}
+          size="md"
+          footer={
+            <div className="flex justify-end gap-3 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowModal(false)}
+              >
+                Batal
+              </Button>
+              <Button type="submit" form="edit-transaction-form">
+                Simpan
+              </Button>
             </div>
-          </div>
-        )}
+          }
+        >
+          <form
+            id="edit-transaction-form"
+            onSubmit={handleUpdateTransaction}
+            className="space-y-4"
+          >
+            <FormGrid columns={1}>
+              <div className="space-y-2">
+                <Label htmlFor="status">Status</Label>
+                <Select
+                  value={formData.status}
+                  onValueChange={(v) =>
+                    setFormData((f) => ({
+                      ...f,
+                      status: v as Transaction["status"],
+                    }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Pilih status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="PENDING">Pending</SelectItem>
+                    <SelectItem value="CONFIRMED">Confirmed</SelectItem>
+                    <SelectItem value="SHIPPED">Shipped</SelectItem>
+                    <SelectItem value="COMPLETED">Completed</SelectItem>
+                    <SelectItem value="CANCELLED">Cancelled</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="customerName">Nama Customer</Label>
+                <Input
+                  id="customerName"
+                  value={formData.customerName}
+                  onChange={(e) =>
+                    setFormData((f) => ({
+                      ...f,
+                      customerName: e.target.value,
+                    }))
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="customerPhone">Telepon Customer</Label>
+                <Input
+                  id="customerPhone"
+                  value={formData.customerPhone}
+                  onChange={(e) =>
+                    setFormData((f) => ({
+                      ...f,
+                      customerPhone: e.target.value,
+                    }))
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="notes">Catatan Admin</Label>
+                <Textarea
+                  id="notes"
+                  value={formData.notes}
+                  onChange={(e) =>
+                    setFormData((f) => ({ ...f, notes: e.target.value }))
+                  }
+                />
+              </div>
+            </FormGrid>
+          </form>
+        </AdminDialog>
       </div>
     </div>
   );
