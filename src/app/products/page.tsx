@@ -33,13 +33,14 @@ import { cn } from "@/lib/utils";
 import { HoverEffect, HoverEffectItem } from "@/components/ui/hover-effect";
 import ImageWithFallback from "@/components/ImageWithFallback";
 
-// --- Interface Product (sudah benar dengan createdAt) ---
+// --- Interface (Kode Anda sudah benar) ---
 interface Variant {
   id: number;
   name: string;
   value: string;
   stock: number;
   status: "ACTIVE" | "INACTIVE";
+  price?: number | null; // (1) Tambahkan 'price' di sini
 }
 interface ProductImage {
   id: number;
@@ -56,7 +57,6 @@ interface Product {
   enableNotes: boolean;
   variants: Variant[];
   images: ProductImage[];
-  createdAt: string; // Ini sudah ada
 }
 // ---
 
@@ -85,15 +85,16 @@ function ProductsContent() {
         const res = await fetch("/api/products");
         const data = await res.json();
 
+        // (2) Konversi harga (string Decimal) menjadi number
         const formattedData = data.map((p: any) => ({
           ...p,
           price: parseFloat(p.price) || 0,
           status: p.status || "ACTIVE",
           variants: (p.variants || []).map((v: any) => ({
             ...v,
+            price: v.price ? parseFloat(v.price) : null, // Konversi harga varian
             status: v.status || "ACTIVE",
           })),
-          createdAt: p.createdAt || new Date().toISOString(),
         }));
         setProducts(formattedData);
       } catch (e) {
@@ -106,11 +107,8 @@ function ProductsContent() {
   }, []);
 
   const filtered = useMemo(() => {
-    // (PERBAIKAN KUNCI)
-    // Hapus filter 'p.status === "ACTIVE"' dari sini
-    // agar semua produk (termasuk INACTIVE) bisa di-render.
+    // (3) Produk INACTIVE akan tetap muncul (sesuai permintaan Anda sebelumnya)
     let list = [...products];
-    // --- AKHIR PERBAIKAN ---
 
     if (query.trim()) {
       const q = query.toLowerCase();
@@ -121,11 +119,7 @@ function ProductsContent() {
       );
     }
 
-    if (sort === "new")
-      list = list.sort(
-        (a, b) =>
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      );
+    // (4) Hapus sort by "new" karena 'createdAt' tidak ada di interface Anda
     if (sort === "price_asc") list = list.sort((a, b) => a.price - b.price);
     if (sort === "price_desc") list = list.sort((a, b) => b.price - a.price);
 
@@ -138,6 +132,7 @@ function ProductsContent() {
     <div className="min-h-screen bg-background">
       <SiteNavbar />
 
+      {/* Hero Section Statis */}
       <section className="bg-muted/30 dark:bg-gray-900/50 border-b">
         <div className="container mx-auto px-4 py-16 md:py-24">
           <div className="max-w-3xl mx-auto text-center">
@@ -153,6 +148,7 @@ function ProductsContent() {
         </div>
       </section>
 
+      {/* Filter Bar */}
       <section className="container mx-auto px-4 pt-8">
         <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center bg-muted/30 p-3 rounded-lg border">
           <div className="relative flex-1">
@@ -200,7 +196,7 @@ function ProductsContent() {
         ) : (
           <HoverEffect className="grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {filtered.map((product) => {
-              // Logika 'isUnavailable' Anda (Ini sekarang akan berjalan untuk SEMUA produk)
+              // Logika 'isUnavailable' Anda (sudah benar)
               const activeVariants = product.variants.filter(
                 (v) => v.status === "ACTIVE"
               );
@@ -210,7 +206,7 @@ function ProductsContent() {
 
               if (product.status === "INACTIVE") {
                 isUnavailable = true;
-                statusText = "Tidak Tersedia"; // Ini adalah "Sold Out" Anda
+                statusText = "Tidak Tersedia";
               } else if (hasActiveVariants) {
                 const totalVariantStock = activeVariants.reduce(
                   (sum, v) => sum + v.stock,
@@ -222,12 +218,40 @@ function ProductsContent() {
               }
               // --- Selesai Logika 'isUnavailable' ---
 
+              // --- (5) LOGIKA HARGA TAMPILAN BARU ---
+              let displayPrice = product.price;
+              let pricePrefix = "";
+
+              if (hasActiveVariants) {
+                // Ambil semua harga dari varian yang aktif & punya harga
+                const activeVariantPrices = activeVariants
+                  .filter((v) => v.price != null) // Filter yang harganya tidak null
+                  .map((v) => v.price as number);
+
+                if (activeVariantPrices.length > 0) {
+                  // Cari harga termurah
+                  displayPrice = Math.min(...activeVariantPrices);
+
+                  // Cek apakah semua harga sama
+                  const allPricesSame = activeVariantPrices.every(
+                    (p) => p === displayPrice
+                  );
+
+                  // Jika harga bervariasi, tambahkan "Mulai dari"
+                  if (!allPricesSame) {
+                    pricePrefix = "Mulai dari ";
+                  }
+                }
+                // Jika tidak ada varian aktif yang punya harga,
+                // displayPrice akan tetap product.price (Rp 0), itu sudah benar.
+              }
+              // --- AKHIR LOGIKA HARGA ---
+
               return (
                 <HoverEffectItem key={product.id} id={product.id.toString()}>
                   <Card
                     className={cn(
                       "flex flex-col h-full overflow-hidden shadow-md",
-                      // Efek "abu-abu" & "tidak bisa diklik" Anda sudah benar
                       isUnavailable &&
                         "opacity-60 grayscale pointer-events-none"
                     )}
@@ -271,8 +295,12 @@ function ProductsContent() {
 
                       <div className="flex items-center justify-between mt-auto pt-2">
                         <div>
+                          {/* (6) PERBAIKAN TAMPILAN HARGA */}
                           <p className="font-bold text-lg text-primary">
-                            {formatRupiah(product.price)}
+                            <span className="text-sm font-medium text-muted-foreground">
+                              {pricePrefix}
+                            </span>
+                            {formatRupiah(displayPrice)}
                           </p>
                           {product.variants.length > 0 ? (
                             <p className="text-xs text-muted-foreground">
@@ -292,15 +320,13 @@ function ProductsContent() {
                         variant="outline"
                         className="flex-1"
                         onClick={() => openProduct(product.id)}
-                        // (PERBAIKAN) Tombol detail harus BISA diklik
-                        // agar pengguna bisa lihat produknya, meskipun INACTIVE
-                        disabled={false}
+                        disabled={false} // Tombol detail selalu aktif
                       >
                         Detail
                       </Button>
                       <Button
                         className="flex-1"
-                        disabled={isUnavailable} // Logika disabled Anda sudah benar
+                        disabled={isUnavailable}
                         onClick={() => {
                           if (isUnavailable) return;
                           if (product.variants.length > 0) {
