@@ -183,10 +183,11 @@ function ProductDetailContent() {
 
   const hasStock = isPurchasable();
 
-  // Menentukan total stok yang relevan untuk Badge
-  // [FIX 2/2] Tambahkan tipe eksplisit 'number' dan 'Variant' pada parameter reduce
-  const displayStock = hasVariants
-    ? availableVariants.reduce((sum: number, v: Variant) => sum + v.stock, 0) // Total stok dari varian aktif
+  // [PERBAIKAN] Logika display stock agar dinamis mengikuti varian
+  const displayStock = selectedVariant
+    ? selectedVariant.stock
+    : hasVariants
+    ? availableVariants.reduce((sum: number, v: Variant) => sum + v.stock, 0)
     : product?.stock || 0;
   // ----------------------------------------
 
