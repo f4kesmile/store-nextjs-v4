@@ -1,14 +1,18 @@
 "use client";
+
 import {
   createContext,
   useContext,
   useEffect,
   useState,
   ReactNode,
+  useCallback,
 } from "react";
-import { useTheme } from "next-themes"; // <-- PERBAIKAN 1: Import useTheme
+import { useTheme } from "next-themes";
 
+// 1. Definisi Tipe Data yang Lengkap
 export type StoreSettings = {
+  id?: number;
   storeName: string;
   storeDescription?: string;
   supportWhatsApp?: string;
@@ -22,8 +26,11 @@ export type StoreSettings = {
   secondaryColor: string;
   theme: "light" | "dark";
   locale: string;
+  isMaintenanceMode: boolean; // Pastikan ini ada
+  errorDetail?: string; // Untuk menangani error dari server
 };
 
+// 2. Default Value yang Aman
 const defaultSettings: StoreSettings = {
   storeName: "Store Saya",
   storeDescription: "Toko online modern dengan sistem manajemen lengkap",
@@ -38,20 +45,22 @@ const defaultSettings: StoreSettings = {
   secondaryColor: "#10B981",
   theme: "light",
   locale: "id",
+  isMaintenanceMode: false,
 };
 
-type Ctx = {
+type SettingsContextType = {
   settings: StoreSettings;
   loading: boolean;
   refresh: () => Promise<void>;
   setSettingsLocal: (s: Partial<StoreSettings>) => void;
 };
 
-const SettingsCtx = createContext<Ctx | null>(null);
+const SettingsContext = createContext<SettingsContextType | null>(null);
 
-let cachedSettings: StoreSettings | null = null;
-let cacheTime: number = 0;
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+// Cache sederhana di luar komponen agar persist antar navigasi
+let globalSettingsCache: StoreSettings | null = null;
+let globalCacheTimestamp: number = 0;
+const CACHE_TTL = 5 * 60 * 1000; // 5 menit
 
 export function SettingsProvider({
   children,
@@ -60,101 +69,128 @@ export function SettingsProvider({
   children: ReactNode;
   initial?: StoreSettings | null;
 }) {
+  // State inisialisasi
   const [settings, setSettings] = useState<StoreSettings>(
-    initial || cachedSettings || defaultSettings
-  );
-  const [loading, setLoading] = useState<boolean>(
-    !initial && (!cachedSettings || Date.now() - cacheTime > CACHE_DURATION)
+    initial || globalSettingsCache || defaultSettings
   );
 
-  // --- PERBAIKAN 2: Dapatkan fungsi setTheme dari next-themes ---
+  // Loading state: True jika tidak ada initial data & cache sudah kadaluarsa
+  const [loading, setLoading] = useState<boolean>(
+    !initial &&
+      (!globalSettingsCache || Date.now() - globalCacheTimestamp > CACHE_TTL)
+  );
+
   const { setTheme } = useTheme();
 
+  // Fungsi Fetch Data (dipisahkan agar bisa dipanggil ulang)
+  const fetchSettings = useCallback(async () => {
+    try {
+      // Tambahkan timestamp query param untuk bypass browser cache
+      const res = await fetch(`/api/settings?t=${Date.now()}`, {
+        cache: "no-store",
+        headers: { Pragma: "no-cache" },
+      });
+
+      if (!res.ok) throw new Error("Failed to fetch settings");
+
+      const data = (await res.json()) as StoreSettings;
+
+      // Merge dengan default untuk memastikan tidak ada field undefined
+      const mergedData = {
+        ...defaultSettings,
+        ...data,
+        // Pastikan boolean tidak undefined/null
+        isMaintenanceMode: data.isMaintenanceMode ?? false,
+      };
+
+      // Update Cache Global
+      globalSettingsCache = mergedData;
+      globalCacheTimestamp = Date.now();
+
+      setSettings(mergedData);
+    } catch (error) {
+      console.error("❌ Failed to load settings:", error);
+      // Jangan set loading false jika error fatal, biarkan UI lama atau default
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Effect: Initial Load
   useEffect(() => {
+    // Jika ada initial props (biasanya dari Server Component), pakai itu
     if (initial) {
-      cachedSettings = initial;
-      cacheTime = Date.now();
+      globalSettingsCache = initial;
+      globalCacheTimestamp = Date.now();
+      setSettings(initial);
       setLoading(false);
       return;
     }
 
-    if (cachedSettings && Date.now() - cacheTime < CACHE_DURATION) {
-      setSettings(cachedSettings);
+    // Jika cache masih valid, pakai cache
+    if (globalSettingsCache && Date.now() - globalCacheTimestamp < CACHE_TTL) {
+      setSettings(globalSettingsCache);
       setLoading(false);
       return;
     }
 
-    let abort = false;
-    (async () => {
-      try {
-        setLoading(true);
-        const res = await fetch("/api/settings", { cache: "no-store" });
-        const data = (await res.json()) as StoreSettings;
-        if (!abort) {
-          cachedSettings = data;
-          cacheTime = Date.now();
-          setSettings(data);
-        }
-      } catch (error) {
-        console.error("Failed to load settings:", error);
-      } finally {
-        if (!abort) setLoading(false);
-      }
-    })();
+    // Jika tidak, fetch dari API
+    fetchSettings();
+  }, [initial, fetchSettings]);
 
-    return () => {
-      abort = true;
-    };
-  }, [initial]);
-
-  // --- PERBAIKAN 3: Sinkronkan tema saat settings dimuat ---
+  // Effect: Sinkronisasi Tema
   useEffect(() => {
     if (!loading && settings.theme) {
-      // Terapkan tema yang dimuat dari database ke next-themes
+      // Hanya set tema jika berbeda untuk menghindari re-render berlebih
       setTheme(settings.theme);
     }
-    // Kita juga tambahkan setTheme sebagai dependensi
   }, [settings.theme, loading, setTheme]);
 
-  const refresh = async () => {
-    const res = await fetch("/api/settings", { cache: "no-store" });
-    const data = (await res.json()) as StoreSettings;
-    cachedSettings = data;
-    cacheTime = Date.now();
-    setSettings(data);
-  };
+  // Fungsi update local state (optimistic UI update)
+  const setSettingsLocal = useCallback(
+    (newPart: Partial<StoreSettings>) => {
+      setSettings((prev) => {
+        const updated = { ...prev, ...newPart };
 
-  const setSettingsLocal = (s: Partial<StoreSettings>) => {
-    setSettings((prev) => {
-      const next = { ...prev, ...s };
-      cachedSettings = next;
-      cacheTime = Date.now();
+        // Update global cache juga agar sinkron
+        globalSettingsCache = updated;
+        globalCacheTimestamp = Date.now();
 
-      // --- PERBAIKAN 4: Langsung ubah tema saat di-update dari admin ---
-      if (s.theme) {
-        setTheme(s.theme);
-      }
+        // Langsung apply tema jika berubah
+        if (newPart.theme) {
+          setTheme(newPart.theme);
+        }
 
-      return next;
-    });
-  };
+        return updated;
+      });
+    },
+    [setTheme]
+  );
 
   return (
-    <SettingsCtx.Provider
-      value={{ settings, loading, refresh, setSettingsLocal }}
+    <SettingsContext.Provider
+      value={{
+        settings,
+        loading,
+        refresh: fetchSettings, // Expose fungsi fetch ulang
+        setSettingsLocal,
+      }}
     >
       <ThemeVariables settings={settings} />
       {children}
-    </SettingsCtx.Provider>
+    </SettingsContext.Provider>
   );
 }
 
 export function useSettings() {
-  const ctx = useContext(SettingsCtx);
-  if (!ctx) throw new Error("useSettings must be used within SettingsProvider");
-  return ctx;
+  const context = useContext(SettingsContext);
+  if (!context) {
+    throw new Error("useSettings must be used within a SettingsProvider");
+  }
+  return context;
 }
 
+// Komponen kecil untuk menyuntikkan variabel CSS dinamis
 function ThemeVariables({ settings }: { settings: StoreSettings }) {
   return (
     <style
@@ -162,15 +198,8 @@ function ThemeVariables({ settings }: { settings: StoreSettings }) {
       dangerouslySetInnerHTML={{
         __html: `
         :root {
-          /* PERBAIKAN: 
-            Ganti '--brand-primary' menjadi '--primary' 
-            Ganti '--brand-secondary' menjadi '--secondary'
-            Ini akan menimpa default HSL dari globals.css dengan HEX dari database.
-          */
           --primary: ${settings.primaryColor};
           --secondary: ${settings.secondaryColor};
-
-          /* (Variabel di bawah ini tidak lagi diperlukan, tapi tidak masalah jika tetap ada) */
           --brand-primary: ${settings.primaryColor};
           --brand-secondary: ${settings.secondaryColor};
         }
