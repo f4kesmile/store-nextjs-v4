@@ -117,6 +117,7 @@ model SiteSettings {
 
 model Transaction {
     id            Int               @id @default(autoincrement())
+    orderId       String?
     productId     Int               @map("product_id")
     product       Product           @relation(fields: [productId], references: [id])
     variantId     Int?              @map("variant_id")

@@ -74,6 +74,7 @@ export async function GET(request: NextRequest) {
       
       // CSV Headers - HAPUS adminNotes
       const headers = [
+        "Order ID",
         'ID Transaksi',
         'Tanggal & Waktu',
         'Tanggal Saja',
@@ -96,6 +97,7 @@ export async function GET(request: NextRequest) {
       transactions.forEach((t) => {
         const createdAt = new Date(t.createdAt);
         const row = [
+          `"${t.orderId || '-'}"`,
           t.id,
           `"${createdAt.toLocaleString('id-ID')}"`,
           `"${createdAt.toLocaleDateString('id-ID')}"`,

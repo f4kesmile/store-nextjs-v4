@@ -77,20 +77,21 @@ export function ResellerProvider({ children }: { children: React.ReactNode }) {
     if (!mounted) return;
 
     const storedRef = getStoredResellerRef();
-    const urlRef = searchParams.get("ref");
+    const urlRef = searchParams.get("ref") || searchParams.get("reseller");
 
-    const refToValidate = storedRef || urlRef;
+    const refToValidate = urlRef || storedRef;
 
     if (refToValidate) {
       validateResellerRef(refToValidate).then((data) => {
         if (data) {
           setActiveResellerData(data);
 
-          if (storedRef) {
-            setLockedRef(storedRef);
-          } else if (urlRef) {
-            // Auto-lock jika ref dari URL valid dan belum ada yang dikunci
+          if (urlRef) {
             lockRef(urlRef, data);
+          } else if (storedRef) {
+            // Auto-lock jika ref dari URL valid dan belum ada yang dikunci
+            setActiveResellerData(data);
+            setLockedRef(storedRef);
           }
         } else {
           // Jika ref dari URL atau storage tidak valid, hapus

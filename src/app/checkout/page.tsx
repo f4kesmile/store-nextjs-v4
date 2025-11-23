@@ -12,7 +12,6 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useCart } from "@/contexts/CartContext";
 import { useReseller } from "@/contexts/ResellerContext";
-// HAPUS: import { useResellerCart } from "@/hooks/useResellerCart"; // Tidak lagi diperlukan
 import { toast } from "sonner";
 import {
   ShoppingCart,
@@ -34,7 +33,6 @@ interface CustomerInfo {
 
 function CheckoutContent() {
   const { cart, getCartTotal, getCartCount, clearCart } = useCart();
-  // PERBAIKAN: Menggunakan activeResellerData
   const { lockedRef, activeResellerData } = useReseller();
   const router = useRouter();
 
@@ -90,6 +88,7 @@ function CheckoutContent() {
     }
   };
 
+  // === BAGIAN INI TELAH DIPERBAIKI ===
   const handleWhatsAppCheckout = async () => {
     if (!validateForm()) {
       toast.error("Mohon lengkapi semua field yang wajib diisi");
@@ -97,64 +96,41 @@ function CheckoutContent() {
     }
 
     setLoading(true);
-    let finalWhatsappUrl: string | undefined = undefined;
 
     try {
-      // PERBAIKAN UTAMA: Looping dan menggunakan URL dari respons server
-      const promises = cart.map((item) =>
-        fetch("/api/checkout", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            productId: item.productId,
-            variantId: item.variantId || null,
-            quantity: item.quantity,
-            resellerId: lockedRef || null,
-            customerInfo, // Kirim seluruh objek customerInfo
-            notes: item.notes,
-          }),
-        })
-      );
+      // PERUBAHAN: Kirim 1 Request berisi SEMUA items (tanpa loop map)
+      const response = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          items: cart, // Mengirim seluruh array cart
+          resellerId: lockedRef || null,
+          customerInfo, // Data customer termasuk global notes
+        }),
+      });
 
-      const responses = await Promise.all(promises);
+      const data = await response.json();
 
-      // Ambil URL WhatsApp dari respons yang berhasil
-      for (const res of responses) {
-        if (res.ok) {
-          const data = await res.json();
-          if (data.whatsappUrl) {
-            finalWhatsappUrl = data.whatsappUrl;
-            // Kita asumsikan URL dari item terakhir adalah URL yang paling informatif
-          }
-        } else {
-          console.error("API transaction failed for one item.");
-        }
-      }
-
-      // HAPUS PANGGILAN processCheckout LAMA DARI useResellerCart
-
-      // Lakukan redirect hanya jika URL berhasil didapatkan
-      if (finalWhatsappUrl) {
+      if (response.ok && data.whatsappUrl) {
         clearCart();
         toast.success("Pesanan berhasil dibuat, mengarahkan ke WhatsApp...");
-        // Redirect menggunakan URL yang dihasilkan server (yang berisi pesan detail)
-        window.open(finalWhatsappUrl, "_blank");
-      } else {
-        toast.error("Gagal membuat pesanan. Cek stok atau coba lagi.");
-        setLoading(false);
-        return;
-      }
 
-      setTimeout(() => {
-        router.push(lockedRef ? `/products?ref=${lockedRef}` : "/products");
-      }, 2000);
+        // Redirect ke URL WhatsApp yang berisi gabungan pesanan
+        window.location.href = data.whatsappUrl;
+      } else {
+        // Handle error dari server
+        toast.error(
+          data.error || "Gagal membuat pesanan. Cek stok atau coba lagi."
+        );
+        setLoading(false);
+      }
     } catch (error) {
       console.error("Checkout error:", error);
-      toast.error("Gagal memproses pesanan");
-    } finally {
+      toast.error("Gagal memproses pesanan (Connection Error)");
       setLoading(false);
     }
   };
+  // ===================================
 
   const handlePaymentGateway = async () => {
     if (!validateForm()) {

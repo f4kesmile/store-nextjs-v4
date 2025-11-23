@@ -67,7 +67,7 @@ export function AdminSidebar({
           )}
         </button>
         {!collapsed && (
-          <div className="text-sm font-semibold truncate">Devlog Store</div>
+          <div className="text-sm font-semibold truncate">Dhimm Store</div>
         )}
       </div>
 

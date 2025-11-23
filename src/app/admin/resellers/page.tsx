@@ -24,7 +24,11 @@ export default function ResellersPage() {
   const [searchValue, setSearchValue] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [editingReseller, setEditingReseller] = useState<Reseller | null>(null);
-  const [formData, setFormData] = useState({ name: "", whatsappNumber: "" });
+  const [formData, setFormData] = useState({
+    name: "",
+    whatsappNumber: "",
+    uniqueId: "",
+  });
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const fetchResellers = async () => {
@@ -50,7 +54,7 @@ export default function ResellersPage() {
 
   const handleCreate = () => {
     setEditingReseller(null);
-    setFormData({ name: "", whatsappNumber: "" });
+    setFormData({ name: "", whatsappNumber: "", uniqueId: "" });
     setShowModal(true);
   };
 
@@ -59,6 +63,7 @@ export default function ResellersPage() {
     setFormData({
       name: reseller.name,
       whatsappNumber: reseller.whatsappNumber,
+      uniqueId: reseller.uniqueId,
     });
     setShowModal(true);
   };
@@ -131,7 +136,7 @@ export default function ResellersPage() {
       key: "uniqueId",
       label: "Link Reseller",
       render: (uniqueId: string) => {
-        const link = `${window.location.origin}?reseller=${uniqueId}`;
+        const link = `${window.location.origin}?ref=${uniqueId}`;
         return (
           <Button
             variant="ghost"
@@ -290,6 +295,21 @@ export default function ResellersPage() {
                   placeholder="John Doe"
                   required
                 />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="uniqueId">ID Unik / Kode Referral</Label>
+                <Input
+                  id="uniqueId"
+                  value={formData.uniqueId}
+                  onChange={(e) =>
+                    setFormData({ ...formData, uniqueId: e.target.value })
+                  }
+                  placeholder="Contoh: AGEN-JAKARTA-01"
+                  required
+                />
+                <p className="text-xs text-muted-foreground">
+                  Kode ini akan digunakan untuk link referral.
+                </p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="whatsappNumber">No. WhatsApp</Label>
