@@ -96,21 +96,22 @@ model ResellerSale {
 }
 
 model SiteSettings {
-    id               Int      @id @default(autoincrement())
-    storeName        String   @default("Store Saya")
-    storeDescription String?  @map("store_description") @db.Text
-    supportWhatsApp  String   @default("6285185031023") @map("support_whatsapp")
-    supportEmail     String   @default("support@store.com") @map("support_email")
-    storeLocation    String?  @map("store_location") @db.Text
-    aboutTitle       String   @default("Tentang Devlog Store") @map("about_title")
-    aboutDescription String?  @map("about_description") @db.Text
-    updatedAt        DateTime @updatedAt @map("updated_at")
-    logoUrl          String?  @map("logo_url")
-    faviconUrl       String?  @map("favicon_url")
-    primaryColor     String   @default("#2563EB") @map("primary_color")
-    secondaryColor   String   @default("#10B981") @map("secondary_color")
-    theme            String   @default("light")
-    locale           String   @default("id")
+    id                Int      @id @default(autoincrement())
+    storeName         String   @default("Store Saya")
+    storeDescription  String?  @map("store_description") @db.Text
+    supportWhatsApp   String   @default("6285185031023") @map("support_whatsapp")
+    supportEmail      String   @default("support@store.com") @map("support_email")
+    storeLocation     String?  @map("store_location") @db.Text
+    aboutTitle        String   @default("Tentang Devlog Store") @map("about_title")
+    aboutDescription  String?  @map("about_description") @db.Text
+    updatedAt         DateTime @updatedAt @map("updated_at")
+    logoUrl           String?  @map("logo_url")
+    faviconUrl        String?  @map("favicon_url")
+    primaryColor      String   @default("#2563EB") @map("primary_color")
+    secondaryColor    String   @default("#10B981") @map("secondary_color")
+    theme             String   @default("light")
+    locale            String   @default("id")
+    isMaintenanceMode Boolean  @default(false) @map("is_maintenance_mode")
 
     @@map("site_settings")
 }
