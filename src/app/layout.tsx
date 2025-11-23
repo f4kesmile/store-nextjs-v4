@@ -1,4 +1,7 @@
 // src/app/layout.tsx
+
+export const dynamic = "force-dynamic";
+
 import type { Metadata } from "next";
 import "./globals.css";
 import { Providers } from "./providers";
