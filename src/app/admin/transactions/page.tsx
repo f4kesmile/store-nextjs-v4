@@ -29,7 +29,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 interface Transaction {
   id: number;
-  orderId?: string | null; // Tambahkan orderId
+  orderId?: string | null;
   createdAt: string;
   product: { name: string; images?: string[] } | null;
   variant: { name: string; value: string } | null;
@@ -42,10 +42,9 @@ interface Transaction {
   notes: string | null;
 }
 
-// Interface baru untuk data yang sudah dikelompokkan
 export interface GroupedTransaction extends Transaction {
-  items: Transaction[]; // List semua barang dalam order ini
-  totalOrderPrice: number; // Total harga gabungan
+  items: Transaction[];
+  totalOrderPrice: number;
 }
 
 // --- HELPER FUNCTIONS ---
@@ -98,14 +97,13 @@ export default function TransactionsPage() {
     customerPhone: "",
   });
 
-  // 1. FUNGSI FETCH & GROUPING (BAGIAN PENTING)
   const fetchTransactions = async () => {
     setLoading(true);
     try {
       const res = await fetch("/api/transactions");
       if (res.ok) {
         const data: Transaction[] = await res.json();
-        processData(data); // Panggil fungsi grouping
+        processData(data);
       } else {
         toast.error("Gagal memuat transaksi");
       }
@@ -117,14 +115,13 @@ export default function TransactionsPage() {
     }
   };
 
-  // Logika Pengelompokan Data berdasarkan Order ID
   const processData = (transactions: Transaction[]) => {
     const groups: { [key: string]: GroupedTransaction } = {};
     const legacyTransactions: GroupedTransaction[] = [];
 
     transactions.forEach((trx) => {
-      // Jika tidak punya Order ID (transaksi lama), pisahkan
       const numericPrice = Number(trx.totalPrice);
+
       if (!trx.orderId) {
         legacyTransactions.push({
           ...trx,
@@ -134,12 +131,10 @@ export default function TransactionsPage() {
         return;
       }
 
-      // Jika Order ID sudah ada, tambahkan item ke grup tersebut
       if (groups[trx.orderId]) {
         groups[trx.orderId].items.push(trx);
         groups[trx.orderId].totalOrderPrice += numericPrice;
       } else {
-        // Buat grup baru
         groups[trx.orderId] = {
           ...trx,
           items: [trx],
@@ -148,7 +143,6 @@ export default function TransactionsPage() {
       }
     });
 
-    // Gabungkan dan urutkan dari yang terbaru
     const combined = [...Object.values(groups), ...legacyTransactions].sort(
       (a, b) =>
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
@@ -161,59 +155,65 @@ export default function TransactionsPage() {
     fetchTransactions();
   }, []);
 
-  // 2. FUNGSI UPDATE & DELETE
+  // --- UPDATE: Fungsi ini akan mengupdate SEMUA item dalam grup ---
   const handleUpdateTransaction = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingTransaction) return;
 
-    // Kita update menggunakan ID transaksi pertama dalam grup
-    // (Idealnya backend punya endpoint update by OrderID, tapi ini workaround)
     try {
-      const res = await fetch(`/api/transactions/${editingTransaction.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
-      });
+      // Kita update semua item dalam grup secara parallel agar konsisten
+      await Promise.all(
+        editingTransaction.items.map((item) =>
+          fetch(`/api/transactions/${item.id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(formData),
+          })
+        )
+      );
 
-      if (res.ok) {
-        toast.success("Berhasil diupdate");
-        setShowModal(false);
-        setEditingTransaction(null);
-        fetchTransactions();
-      } else {
-        toast.error("Gagal update");
-      }
+      toast.success("Status pesanan berhasil diperbarui");
+      setShowModal(false);
+      setEditingTransaction(null);
+      fetchTransactions();
     } catch (error) {
-      toast.error("Terjadi kesalahan");
+      toast.error("Terjadi kesalahan saat update");
     }
   };
 
-  const handleDeleteTransaction = async (id: number) => {
-    if (!confirm("Hapus transaksi ini?")) return;
+  // --- BARU: Fungsi ini menghapus SELURUH PESANAN (Semua Item) ---
+  const handleDeleteOrder = async (group: GroupedTransaction) => {
+    if (
+      !confirm(
+        `Yakin hapus pesanan ${group.orderId || ""} (${
+          group.items.length
+        } produk)?`
+      )
+    )
+      return;
+
     try {
-      const res = await fetch(`/api/transactions/${id}`, { method: "DELETE" });
-      if (res.ok) {
-        toast.success("Dihapus");
-        fetchTransactions();
-      } else {
-        toast.error("Gagal hapus");
-      }
+      // Hapus semua item dalam grup secara parallel
+      await Promise.all(
+        group.items.map((item) =>
+          fetch(`/api/transactions/${item.id}`, { method: "DELETE" })
+        )
+      );
+
+      toast.success("Pesanan berhasil dihapus");
+      fetchTransactions();
     } catch (error) {
-      toast.error("Error");
+      toast.error("Gagal menghapus pesanan");
     }
   };
 
-  // 3. FILTERING PADA DATA YANG SUDAH DI-GROUP
   const filteredData = useMemo(() => {
     return groupedTransactions
       .filter((t) => filterStatus === "all" || t.status === filterStatus)
       .filter((t) => {
         const searchLower = searchValue.toLowerCase();
-        // Cek ID Utama
         if (t.orderId?.toLowerCase().includes(searchLower)) return true;
         if (t.customerName?.toLowerCase().includes(searchLower)) return true;
-
-        // Cek Nama Produk di dalam Items
         const hasProduct = t.items.some((item) =>
           item.product?.name.toLowerCase().includes(searchLower)
         );
@@ -221,7 +221,6 @@ export default function TransactionsPage() {
       });
   }, [groupedTransactions, searchValue, filterStatus]);
 
-  // 4. DEFINISI KOLOM TABEL (MODIFIKASI TAMPILAN)
   const columns = [
     {
       key: "orderId",
@@ -240,7 +239,7 @@ export default function TransactionsPage() {
       ),
     },
     {
-      key: "items", // Virtual Key
+      key: "items",
       label: "Daftar Produk",
       className: "min-w-[300px]",
       render: (_: any, row: GroupedTransaction) => (
@@ -254,9 +253,6 @@ export default function TransactionsPage() {
                   : ""
               }`}
             >
-              {/* Jika ada gambar produk (opsional) */}
-              {/* <div className="w-8 h-8 bg-gray-100 rounded flex-shrink-0" /> */}
-
               <div className="flex-1">
                 <p className="font-medium text-sm leading-tight">
                   {item.product?.name || "Produk Dihapus"}
@@ -277,7 +273,7 @@ export default function TransactionsPage() {
               </div>
               <div className="text-right">
                 <span className="text-xs font-medium">
-                  {formatPrice(item.totalPrice)}
+                  {formatPrice(Number(item.totalPrice))}
                 </span>
               </div>
             </div>
@@ -342,12 +338,13 @@ export default function TransactionsPage() {
                 setShowModal(true);
               },
             },
-            // Note: Hapus mungkin hanya menghapus 1 item jika API belum support Order ID
-            // {
-            //   label: "Hapus",
-            //   onClick: () => handleDeleteTransaction(t.id),
-            //   variant: "destructive",
-            // },
+            // === TOMBOL HAPUS DIAKTIFKAN KEMBALI ===
+            {
+              label: "Hapus",
+              onClick: () => handleDeleteOrder(t), // Panggil fungsi hapus order
+              variant: "destructive",
+            },
+            // =======================================
           ]}
         />
       ),
@@ -357,12 +354,11 @@ export default function TransactionsPage() {
   return (
     <div className="min-h-screen p-4 sm:p-6">
       <div className="max-w-7xl mx-auto space-y-6">
-        {/* Header Page */}
         <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold">Transaksi</h1>
             <p className="text-muted-foreground mt-1">
-              Kelola semua pesanan masuk
+              Kelola semua pesanan masuk (Grouped)
             </p>
           </div>
           <TransactionExportButton />
@@ -372,11 +368,10 @@ export default function TransactionsPage() {
           title="Riwayat Pesanan"
           description={`${filteredData.length} pesanan ditemukan`}
         >
-          {/* Tampilan Desktop */}
           <div className="hidden md:block">
             <AdminTable
               columns={columns}
-              data={filteredData} // Gunakan data yang sudah di-group
+              data={filteredData}
               loading={loading}
               searchable
               searchValue={searchValue}
@@ -400,9 +395,8 @@ export default function TransactionsPage() {
             />
           </div>
 
-          {/* Tampilan Mobile (Kartu) */}
+          {/* Tampilan Mobile */}
           <div className="block md:hidden space-y-4">
-            {/* Search Mobile */}
             <div className="flex gap-2">
               <Input
                 placeholder="Cari..."
@@ -430,7 +424,6 @@ export default function TransactionsPage() {
                     </Badge>
                   </div>
 
-                  {/* List Item Mobile */}
                   <div className="border-t border-b py-2 space-y-2">
                     {t.items.map((item) => (
                       <div
@@ -441,7 +434,7 @@ export default function TransactionsPage() {
                           {item.quantity}x {item.product?.name}
                         </span>
                         <span className="font-medium">
-                          {formatPrice(item.totalPrice)}
+                          {formatPrice(Number(item.totalPrice))}
                         </span>
                       </div>
                     ))}
@@ -462,30 +455,39 @@ export default function TransactionsPage() {
                     </div>
                   </div>
 
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full"
-                    onClick={() => {
-                      setEditingTransaction(t);
-                      setFormData({
-                        status: t.status,
-                        notes: t.notes || "",
-                        customerName: t.customerName || "",
-                        customerPhone: t.customerPhone || "",
-                      });
-                      setShowModal(true);
-                    }}
-                  >
-                    Edit Status
-                  </Button>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      onClick={() => {
+                        setEditingTransaction(t);
+                        setFormData({
+                          status: t.status,
+                          notes: t.notes || "",
+                          customerName: t.customerName || "",
+                          customerPhone: t.customerPhone || "",
+                        });
+                        setShowModal(true);
+                      }}
+                    >
+                      Edit
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      className="w-full"
+                      onClick={() => handleDeleteOrder(t)}
+                    >
+                      Hapus
+                    </Button>
+                  </div>
                 </Card>
               ))
             )}
           </div>
         </AdminCard>
 
-        {/* Modal Edit */}
         <AdminDialog
           open={showModal}
           onOpenChange={setShowModal}

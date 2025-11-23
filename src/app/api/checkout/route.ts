@@ -51,8 +51,8 @@ export async function POST(req: NextRequest) {
 
     // Persiapan Pesan WhatsApp Header
     const now = new Date();
-    const orderDate = now.toLocaleDateString("id-ID", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
-    const orderTime = now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", hour12: false });
+    const orderDate = now.toLocaleDateString("id-ID", { weekday: "long", year: "numeric", month: "long", day: "numeric", timeZone: "Asia/Jakarta", });
+    const orderTime = now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Jakarta", });
 
     let message = `Halo ${resellerName}! 👋\n\n`;
     message += `Pesanan Baru #${orderId}\n`;
